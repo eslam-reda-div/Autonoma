@@ -1,10 +1,10 @@
 # Autonoma
 
-A **Multi-Agent AI Assistant System** that lets you automate complex computational workflows via a simple chat or voice interface over your local network. Built with a Python backend orchestrated by LangChain + LangGraph and a Next.js frontend, Autonoma empowers you to run tasks such as web scraping, scripting, file management, and full desktop automation—all within a secure, LAN-only environment.
+A **Multi-Agent AI Assistant System** that lets you automate complex computational workflows via a simple chat interface over your local network. Built with a Python backend orchestrated by LangChain + LangGraph and a Next.js frontend, Autonoma empowers you to run tasks such as web scraping, scripting, file management, and full desktop automation—all within a secure, LAN-only environment.
 
 ## 🚀 Features
 
-- **Chat & Voice Interface**: Interact via text or speech in English and Arabic.
+- **Chat Interface**: Interact via text or speech in English and Arabic.
 - **Multi-Agent Orchestration**: Coordinator, Planner, Supervisor, Researcher, Coder, Browser, File Manager, Computer, Reporter.
 - **Real‐Time Transparency**: Live activity stream, error reports, partial results.
 - **LAN‐Only Security**: All traffic confined to your local network, sandboxed agents, full audit trails.
@@ -73,7 +73,7 @@ A **Multi-Agent AI Assistant System** that lets you automate complex computation
    python user.py
    ```
 2. **Scan the QR code** displayed in your terminal or browser to connect your mobile/web client.
-3. **Interact** with Autonoma via chat or voice—ask it to scrape data, run scripts, manage files, or automate desktop tasks.
+3. **Interact** with Autonoma via chat it to scrape data, run scripts, manage files, or automate desktop tasks.
 
 ## 🤝 Contributing
 
