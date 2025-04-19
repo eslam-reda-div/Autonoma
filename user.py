@@ -3,16 +3,16 @@ import socket
 import subprocess
 import threading
 import time
-import qrcode
 from colorama import init, Fore, Style
 from PIL import Image
+import io
 import re
+import qrcode
+from qrcode.main import QRCode
 import logging
 import uvicorn
 import sys
-import pyngrok.ngrok as ngrok
-from qrcode.main import QRCode
-import io
+import shutil
 
 # Initialize colorama for colored terminal output
 init()
@@ -90,11 +90,41 @@ def display_qr_code(url):
     
     print(f"{Fore.YELLOW}Web application URL: {url}{Style.RESET_ALL}")
 
+def print_qr_code(url: str):
+    # Extract clean URL from ngrok URL if needed
+    clean_url = url
+    
+    qr = QRCode()
+    qr.add_data(clean_url + "/api")
+    qr.make()
+    
+    # Create string buffer to capture console output
+    f = io.StringIO()
+    qr.print_ascii(out=f)
+    f.seek(0)
+    
+    print(f.getvalue())
+
 def run_api_server():
     """Run the API server using uvicorn in a subprocess"""
     print(f"{Fore.BLUE}Starting API server on network...{Style.RESET_ALL}")
     
     port = 8833
+    
+    # Check for an available port
+    def is_port_in_use(port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', port)) == 0
+
+    # Start with the desired port and increment until we find an available one
+    initial_port = port
+    while is_port_in_use(port):
+        print(f"{Fore.YELLOW}Port {port} is in use, trying the next one.{Style.RESET_ALL}")
+        port += 1
+
+    if port != initial_port:
+        print(f"{Fore.GREEN}Found available port: {port}{Style.RESET_ALL}")
+    
     local_ip = get_local_ip()
     network_url = f"http://{local_ip}:{port}"
     api_url = network_url
@@ -153,8 +183,11 @@ def run_api_server():
         except Exception as e:
             print(f"{Fore.RED}Alternative API server start failed: {str(e)}{Style.RESET_ALL}")
             return api_url, None
+        
+    print_qr_code(api_url)
     
-    print(f"{Fore.GREEN}API server started successfully at {api_url}{Style.RESET_ALL}")
+    print(f"{Fore.GREEN}API server started successfully at {api_url+'/api'}{Style.RESET_ALL}")
+    
     return api_url, api_process
 
 def run_web_app():
@@ -163,14 +196,88 @@ def run_web_app():
     
     print(f"{Fore.BLUE}Starting web application from {web_app_path}...{Style.RESET_ALL}")
     
-    # Change to the web app directory and run pnpm start
-    os.chdir(web_app_path)
-    web_process = subprocess.Popen(
-        ["pnpm", "start-server"],
+    # Clean up previous build artifacts
+    out_dir = os.path.join(web_app_path, "out")
+    next_dir = os.path.join(web_app_path, ".next")
+
+    print(f"{Fore.BLUE}Cleaning up previous build artifacts...{Style.RESET_ALL}")
+
+    # Function to force delete a directory and its contents
+    def force_delete_dir(dir_path):
+        if os.path.exists(dir_path):
+            try:
+                # Try using rmtree to remove directory and contents
+                shutil.rmtree(dir_path, ignore_errors=True)
+                print(f"{Fore.GREEN}Removed directory: {dir_path}{Style.RESET_ALL}")
+            except Exception as e:
+                # If that fails, try using system commands based on OS
+                print(f"{Fore.YELLOW}Using system commands to force delete: {dir_path}{Style.RESET_ALL}")
+                try:
+                    if os.name == 'nt':  # Windows
+                        subprocess.run(f'rmdir /S /Q "{dir_path}"', shell=True, check=False)
+                    else:  # Unix/Linux/Mac
+                        subprocess.run(f'rm -rf "{dir_path}"', shell=True, check=False)
+                    print(f"{Fore.GREEN}Removed directory: {dir_path}{Style.RESET_ALL}")
+                except Exception as inner_e:
+                    print(f"{Fore.RED}Failed to delete {dir_path}: {str(inner_e)}{Style.RESET_ALL}")
+
+    # Delete build directories
+    force_delete_dir(out_dir)
+    force_delete_dir(next_dir)
+    
+    # First build the web application
+    print(f"{Fore.BLUE}Building web application...{Style.RESET_ALL}")
+    build_process = subprocess.Popen(
+        ["pnpm", "build"],
+        cwd=web_app_path,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,
         bufsize=1
+    )
+
+    # Monitor the build process
+    for line in iter(build_process.stdout.readline, ''):
+        print(f"{Fore.CYAN}[BUILD] {line.strip()}{Style.RESET_ALL}")
+    for line in iter(build_process.stderr.readline, ''):
+        print(f"{Fore.RED}[BUILD ERROR] {line.strip()}{Style.RESET_ALL}")
+
+    # Wait for build to complete
+    build_process.wait()
+
+    if build_process.returncode != 0:
+        print(f"{Fore.RED}Web application build failed with return code {build_process.returncode}{Style.RESET_ALL}")
+        sys.exit(1)
+
+    print(f"{Fore.GREEN}Web application built successfully!{Style.RESET_ALL}")
+    
+    # Set initial port number
+    web_port = 3000
+    
+    # Check for an available port
+    def is_port_in_use(port):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', port)) == 0
+
+    # Find an available port
+    initial_port = web_port
+    while is_port_in_use(web_port):
+        print(f"{Fore.YELLOW}Port {web_port} is in use, trying the next one.{Style.RESET_ALL}")
+        web_port += 1
+
+    if web_port != initial_port:
+        print(f"{Fore.GREEN}Found available port for web app: {web_port}{Style.RESET_ALL}")
+    
+    # Change to the web app directory and serve the out folder
+    print(f"{Fore.BLUE}Starting web server on port {web_port}...{Style.RESET_ALL}")
+    web_process = subprocess.Popen(
+        ["npx", "serve@latest", "out", "-l", str(web_port)],
+        cwd=web_app_path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        bufsize=1,
+        shell=True  # Use with caution
     )
     
     # Start a thread to monitor and display output
@@ -183,7 +290,8 @@ def run_web_app():
     thread = threading.Thread(target=monitor_output, args=(web_process, "WEB"), daemon=True)
     thread.start()
     
-    return web_process
+    # Return both the process and the port number
+    return web_process, web_port
 
 def main():
     print(f"{Fore.MAGENTA}=== Starting Development Environment ==={Style.RESET_ALL}")
@@ -194,20 +302,19 @@ def main():
     
     # Start API server
     api_url, api_process = run_api_server()
-    print(f"{Fore.GREEN}API server started at: {api_url}{Style.RESET_ALL}")
     
     # Update environment file
     update_env_file(api_url)
     
     # Start web application
-    web_process = run_web_app()
+    web_process, web_port = run_web_app()
     
     # Wait for web app to initialize (typically on port 3000)
     print(f"{Fore.YELLOW}Waiting for web application to start...{Style.RESET_ALL}")
     time.sleep(10)  # Give it some time to start
     
     # Generate QR code for web app URL
-    web_url = f"http://{local_ip}:3000"
+    web_url = f"http://{local_ip}:{web_port}"
     display_qr_code(web_url)
     
     try:

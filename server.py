@@ -23,11 +23,6 @@ def get_local_ip():
 def print_qr_code(url: str):
     # Extract clean URL from ngrok URL if needed
     clean_url = url
-    if "ngrok-free.app" in url:
-        # Remove the NgrokTunnel text and the part after the URL
-        match = re.search(r'(https?://[^"]+)', url)
-        if match:
-            clean_url = match.group(1)
     
     qr = QRCode()
     qr.add_data(clean_url + "/api")

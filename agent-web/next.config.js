@@ -13,19 +13,14 @@ const config = {
     });
     return config;
   },
-  experimental: {
-    turbo: {
-      rules: {
-        "*.txt": {
-          loaders: ["raw-loader"],
-          as: "*.js",
-        },
+  turbopack: { // Moved from experimental.turbo to top-level
+    rules: {
+      "*.txt": {
+        loaders: ["raw-loader"],
+        as: "*.js",
       },
     },
   },
-  // ... rest of the configuration.
-  // output: "standalone",
-  // output: "standalone",
   output: 'export',
   reactStrictMode: true,
   images: {
