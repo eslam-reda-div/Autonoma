@@ -145,6 +145,11 @@ class BrowserTool(BaseTool):
         
     def _ensure_browser(self):
         """Ensure browser is initialized."""
+        use_user_chrome_instance = os.getenv("USE_USER_CHROME_INSTANSE", "False") == "True"
+        if not use_user_chrome_instance:
+            # If not using user Chrome instance, return success without initializing browser
+            return True
+        # Only initialize browser if we're using user Chrome instance
         if self._browser is None:
             self._browser = initialize_browser()
         return self._browser is not None
@@ -156,12 +161,22 @@ class BrowserTool(BaseTool):
             
         generated_gif_path = f"{BROWSER_HISTORY_DIR}/{uuid.uuid4()}.gif"
         
-        self._agent = BrowserAgent(
-            task=instruction,
-            llm=llm,
-            browser=self._browser,
-            generate_gif=generated_gif_path,
-        )
+        use_user_chrome_instance = os.getenv("USE_USER_CHROME_INSTANSE", "False") == "True"
+        
+        # Create the BrowserAgent with or without the browser parameter based on the env var
+        if use_user_chrome_instance:
+            self._agent = BrowserAgent(
+                task=instruction,
+                llm=llm,
+                browser=self._browser,
+                generate_gif=generated_gif_path,
+            )
+        else:
+            self._agent = BrowserAgent(
+                task=instruction,
+                llm=llm,
+                generate_gif=generated_gif_path,
+            )
 
         try:
             loop = asyncio.new_event_loop()
@@ -202,12 +217,23 @@ class BrowserTool(BaseTool):
             
         generated_gif_path = f"{BROWSER_HISTORY_DIR}/{uuid.uuid4()}.gif"
         
-        self._agent = BrowserAgent(
-            task=instruction,
-            llm=llm,
-            browser=self._browser,
-            generate_gif=generated_gif_path,
-        )
+        use_user_chrome_instance = os.getenv("USE_USER_CHROME_INSTANSE", "False") == "True"
+        
+        # Create the BrowserAgent with or without the browser parameter based on the env var
+        if use_user_chrome_instance:
+            self._agent = BrowserAgent(
+                task=instruction,
+                llm=llm,
+                browser=self._browser,
+                generate_gif=generated_gif_path,
+            )
+        else:
+            self._agent = BrowserAgent(
+                task=instruction,
+                llm=llm,
+                generate_gif=generated_gif_path,
+            )
+            
         try:
             result = await self._agent.run()
             if isinstance(result, AgentHistoryList):

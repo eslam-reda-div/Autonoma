@@ -12,6 +12,7 @@ import {
   type WorkflowMessage,
   type Message,
   type TextMessage,
+  type ImageTextMessage,
 } from "../messaging";
 import { clone } from "../utils";
 import { WorkflowEngine } from "../workflow";

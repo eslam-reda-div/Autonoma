@@ -243,6 +243,7 @@ export function WorkflowProgressView({
 function PlanTaskView({ task }: { task: ThinkingTask }) {
   const [isThinkingCollapsed, setIsThinkingCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showThinking, setShowThinking] = useState(true);
 
   useEffect(() => {
     const checkIsMobile = () => {
@@ -257,31 +258,74 @@ function PlanTaskView({ task }: { task: ThinkingTask }) {
     };
   }, []);
 
+  // Extract thinking process and plan from the payload text
+  const { thinkingProcess, jsonPlan } = useMemo(() => {
+    if (!task.payload.text) return { thinkingProcess: "", jsonPlan: "" };
+    
+    let thinkingProcess = "";
+    let jsonPlan = task.payload.text.trim();
+    
+    // Check if the text contains a <think> tag
+    // Check if the text contains a <think> tag
+    const thinkStartIndex = jsonPlan.indexOf('<think>');
+    if (thinkStartIndex !== -1) {
+      // Extract content after <think> tag
+      const afterThinkTagContent = jsonPlan.substring(thinkStartIndex + 7);
+      
+      // Find the closing tag
+      const thinkEndIndex = afterThinkTagContent.indexOf('</think>');
+      
+      if (thinkEndIndex !== -1) {
+      // Extract thinking process and remaining JSON plan
+      thinkingProcess = afterThinkTagContent.substring(0, thinkEndIndex).trim();
+      jsonPlan = afterThinkTagContent.substring(thinkEndIndex + 8).trim();
+      } else {
+      // If closing tag not found yet, consider everything after opening tag as thinking
+      thinkingProcess = afterThinkTagContent.trim();
+      jsonPlan = ""; // No JSON plan extracted yet until closing tag is found
+      }
+    }
+    
+    return { thinkingProcess, jsonPlan };
+  }, [task.payload.text]);
+
   const plan = useMemo<{
     title?: string;
     steps?: { title?: string; description?: string }[];
   }>(() => {
-    if (task.payload.text) {
-      let jsonString = task.payload.text.trim();
-      if (jsonString.startsWith("```json\n")) {
-        jsonString = jsonString.substring(7);
-      } else if (jsonString.startsWith("```ts\n")) {
-        jsonString = jsonString.substring(5);
-      }
-      if (jsonString.endsWith("\n```")) {
-        jsonString = jsonString.substring(0, jsonString.length - 3);
-      }
+    if (!jsonPlan) return {};
+    
+    let jsonString = jsonPlan;
+    
+    // Handle code block markers
+    if (jsonString.startsWith("```json\n")) {
+      jsonString = jsonString.substring(7);
+    } else if (jsonString.startsWith("```ts\n")) {
+      jsonString = jsonString.substring(5);
+    }
+    if (jsonString.endsWith("\n```")) {
+      jsonString = jsonString.substring(0, jsonString.length - 3);
+    }
+    
+    // Find the first valid JSON object in the string
+    let jsonStartIndex = jsonString.indexOf('{');
+    if (jsonStartIndex !== -1) {
+      jsonString = jsonString.substring(jsonStartIndex);
       try {
         return parse(jsonString);
       } catch {
         return {};
       }
     }
+    
     return {};
-  }, [task]);
-  const reason = task.payload.reason;
+  }, [jsonPlan]);
+  
+  // Use thinkingProcess instead of reason if available
+  const displayThinking = thinkingProcess || task.payload.reason;
   const markdown = `## ${plan.title ?? ""}\n\n${plan.steps?.map((step) => `- **${step.title ?? ""}**\n\n${step.description ?? ""}`).join("\n\n") ?? ""}`;
 
+  // Auto-collapse the thinking only when it's complete
   useOnStateChangeEffect(
     task.state,
     {
@@ -293,9 +337,16 @@ function PlanTaskView({ task }: { task: ThinkingTask }) {
     }
   );
 
+  // Show the thinking process while the task is in progress
+  useEffect(() => {
+    if (task.state === "pending" && displayThinking) {
+      setIsThinkingCollapsed(false);
+    }
+  }, [task.state, displayThinking]);
+
   return (
     <li key={task.id} className="flex flex-col max-w-full overflow-hidden">
-      {reason && (
+      {displayThinking && (
         <Accordion
           type="single"
           collapsible
@@ -311,11 +362,13 @@ function PlanTaskView({ task }: { task: ThinkingTask }) {
                 <AccordionTrigger
                   className={cn(
                     "flex w-fit flex-none items-center gap-2 rounded-2xl border px-3 py-1 text-sm hover:no-underline [&[data-state=open]>svg]:rotate-180",
-                    isMobile && "px-2 py-0.5 text-xs"
+                    isMobile && "px-2 py-0.5 text-xs",
+                    task.state === "pending" && "animate-pulse"
                   )}
                 >
                   <Atom className={cn("h-4 w-4", isMobile && "h-3 w-3")} />
                   <span>Deep Thought</span>
+                  {task.state === "pending" && <span className="ml-1">...</span>}
                 </AccordionTrigger>
               </TooltipTrigger>
               <TooltipContent side="left">
@@ -329,7 +382,7 @@ function PlanTaskView({ task }: { task: ThinkingTask }) {
                   isMobile && "pl-3 text-xs"
                 )}
               >
-                {reason}
+                {displayThinking}
               </Markdown>
             </AccordionContent>
           </AccordionItem>
@@ -357,6 +410,8 @@ function getStepName(step: WorkflowStep) {
       return "Coding";
     case "file_manager":
       return "File Management";
+    case "computer":
+      return "Controlling Computer";
     case "planner":
       return "Planning";
     case "researcher":

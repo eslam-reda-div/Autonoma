@@ -4,8 +4,10 @@ import {
   RobotOutlined,
   AudioOutlined,
   TranslationOutlined,
+  PictureOutlined,
+  CloseCircleOutlined,
 } from "@ant-design/icons";
-import { type KeyboardEvent, useCallback, useEffect, useState, useRef } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useState, useRef, ChangeEvent } from "react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -38,7 +40,7 @@ export function InputBox({
   responding?: boolean;
   onSend?: (
     message: string,
-    options: { deepThinkingMode: boolean; searchBeforePlanning: boolean },
+    options: { deepThinkingMode: boolean; searchBeforePlanning: boolean; images?: string[] },
   ) => void;
   onCancel?: () => void;
 }) {
@@ -51,6 +53,10 @@ export function InputBox({
   const [imeStatus, setImeStatus] = useState<"active" | "inactive">("inactive");
   const [isRecording, setIsRecording] = useState(false);
   const [speechLanguage, setSpeechLanguage] = useState<"en-US" | "ar-SA">("en-US");
+  const [images, setImages] = useState<{ base64: string; file: File }[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const saveConfig = useCallback(() => {
@@ -68,8 +74,9 @@ export function InputBox({
         return;
       }
       if (onSend) {
-        onSend(message, { deepThinkingMode, searchBeforePlanning });
+        onSend(message, { deepThinkingMode, searchBeforePlanning, images: images.map((img) => img.base64) });
         setMessage("");
+        setImages([]);
       }
     }
   }, [
@@ -79,6 +86,7 @@ export function InputBox({
     onSend,
     deepThinkingMode,
     searchBeforePlanning,
+    images,
   ]);
 
   const handleKeyDown = useCallback(
@@ -112,6 +120,62 @@ export function InputBox({
   useEffect(() => {
     saveConfig();
   }, [deepThinkingMode, searchBeforePlanning, saveConfig]);
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to convert file to base64'));
+        }
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const handlePaste = useCallback((event: Event) => {
+    const clipboardEvent = event as ClipboardEvent;
+    const items = clipboardEvent.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item && item.type.indexOf('image') !== -1) {
+        clipboardEvent.preventDefault(); // Prevent the default paste action
+        const file = item.getAsFile();
+        if (!file) continue;
+        
+        setIsUploading(true);
+        
+        (async () => {
+          try {
+            const base64 = await fileToBase64(file);
+            setImages(prev => [...prev, { base64, file }]);
+          } catch (error) {
+            console.error('Error processing pasted image:', error);
+          } finally {
+            setIsUploading(false);
+          }
+        })();
+        
+        break; // Only handle the first image for now
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    // Add paste event listener to the textarea
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.addEventListener('paste', handlePaste);
+      return () => {
+        textarea.removeEventListener('paste', handlePaste);
+      };
+    }
+  }, [handlePaste]);
 
   const toggleVoiceRecording = useCallback(() => {
     if (isRecording) {
@@ -160,10 +224,80 @@ export function InputBox({
     }
   }, [isRecording, speechLanguage]);
 
+  const handleFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    try {
+      const newImages: Array<{ base64: string; file: File }> = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file || !file.type.startsWith('image/')) continue;
+        
+        const base64 = await fileToBase64(file);
+        newImages.push({ base64, file });
+      }
+      
+      setImages(prev => [...prev, ...newImages]);
+    } catch (error) {
+      console.error('Error processing images:', error);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''; // Reset file input
+      }
+    }
+  }, []);
+
+  const handleImageUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleRemoveImage = useCallback((index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
   return (
     <div className={cn(className)}>
+      {/* Images preview section - moved above the text input */}
+      {images.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-2 py-2 sm:px-3 md:px-4 border-b border-gray-100">
+          {images.map((image, index) => (
+            <div key={index} className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 overflow-hidden rounded-md shadow-sm border border-gray-200 group">
+              <img
+                src={image.base64}
+                alt={`Uploaded ${index}`}
+                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-20 transition-opacity"></div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute top-1 right-1 h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 rounded-full bg-white bg-opacity-80 hover:bg-opacity-100 border-none shadow-md text-red-500 hover:text-red-600 hover:bg-red-50 transition-all"
+                onClick={() => handleRemoveImage(index)}
+              >
+                <CloseCircleOutlined className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
+              </Button>
+            </div>
+          ))}
+          {isUploading && (
+            <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 border border-dashed border-gray-300 rounded-md flex items-center justify-center bg-gray-50">
+              <div className="animate-pulse text-blue-500">
+                <svg className="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      
       <div className="w-full">
         <textarea
+          ref={textareaRef}
           className={cn(
             "m-0 w-full resize-none border-none px-4 py-3 text-base md:text-lg",
             size === "large" ? "min-h-20 sm:min-h-24 md:min-h-28 lg:min-h-32" : "min-h-4",
@@ -285,6 +419,25 @@ export function InputBox({
               <p>Search before planning</p>
             </TooltipContent>
           </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className={cn(
+                  "h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 rounded-full",
+                  isUploading ? "bg-gray-100 border-gray-300 text-gray-500" : "bg-button",
+                )}
+                onClick={handleImageUploadClick}
+              >
+                <PictureOutlined className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Upload Images</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-1.5 md:gap-2 mt-2 sm:mt-1 md:mt-0">
           <Tooltip>
@@ -367,6 +520,14 @@ export function InputBox({
           </Tooltip>
         </div>
       </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
+        multiple
+        onChange={handleFileChange}
+      />
     </div>
   );
 }

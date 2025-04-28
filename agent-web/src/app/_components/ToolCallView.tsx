@@ -3,6 +3,7 @@ import {
   PythonOutlined,
   SearchOutlined,
   UnorderedListOutlined,
+  LaptopOutlined,
 } from "@ant-design/icons";
 import { LRUCache } from "lru-cache";
 import { useMemo } from "react";
@@ -22,6 +23,8 @@ export function ToolCallView({ task }: { task: ToolCallTask }) {
     return <PythonReplToolCallView task={task as ToolCallTask<any>} />;
   } else if (task.payload.toolName === "bash_tool") {
     return <BashToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "computer") {
+    return <ComputerToolCallView task={task as ToolCallTask<any>} />;
   }
   return <div>{task.payload.toolName}</div>;
 }
@@ -40,6 +43,58 @@ function BrowserToolCallView({
         <div>
           <span className="text-sm">{task.payload.input.instruction}</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ComputerToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ task: string }>;
+}) {
+  const isPending = task.state === "pending";
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <LaptopOutlined className="h-4 w-4 text-sm" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Performing Computer Operation</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-6 shadow-sm overflow-hidden">
+        {/* Mirror/reflection effect at the top */}
+        <div className="absolute top-0 left-0 right-0 h-[40%] bg-gradient-to-b from-white/40 to-transparent opacity-60"></div>
+        
+        <div className="flex flex-col items-center justify-center">
+          {/* Computer icon with pulsing animation during pending state */}
+          <div className={`relative flex items-center justify-center mb-2 ${isPending ? 'animate-pulse' : ''}`}>
+            <LaptopOutlined className="text-blue-500 text-4xl" />
+          </div>
+          
+          {/* Task description */}
+          <div className="text-center mt-3 text-sm text-gray-700 max-w-[500px]">
+            {task.payload.input.task}
+          </div>
+          
+          {/* Loading indicator or completion status */}
+          {isPending ? (
+            <div className="mt-4 text-xs text-gray-500">
+              Processing operation...
+            </div>
+          ) : (
+            <div className="mt-4 text-xs text-green-600 font-medium">
+              Operation completed
+            </div>
+          )}
+        </div>
+        
+        {/* Bottom reflection/shadow */}
+        <div className="absolute bottom-0 left-0 right-0 h-[30%] bg-gradient-to-t from-gray-200/30 to-transparent"></div>
       </div>
     </div>
   );

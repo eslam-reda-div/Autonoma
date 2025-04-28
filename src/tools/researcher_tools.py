@@ -26,6 +26,7 @@ tools = [
     youtube_search_tool,
     wikipedia_search_tool,
     open_weather_map_search_tool,
+    hyperbrowser_extract_tool,
     # youtube_channel_search_tool,
     # youtube_video_search_tool,
     # website_search_tool,
@@ -37,5 +38,4 @@ tools = [
     # website_scrape_tool,
     # scrape_element_tool,
     # firecrawl_crawl_website_tool,
-    hyperbrowser_extract_tool
 ]

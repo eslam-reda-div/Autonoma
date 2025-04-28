@@ -41,19 +41,19 @@ def code_node(state: State) -> Command[Literal["supervisor"]]:
     global eval
     logger.info("Code agent starting task")
 
-    code_act = create_codeact(
-        coder_llm, 
-        tools, 
-        eval,
-        lambda state: apply_prompt_template('coder', state)
-    )
-    coder_agent = code_act.compile(checkpointer=MemorySaver())
-
-    # coder_agent = create_react_agent(
-    #     coder_llm,
-    #     tools=tools,
-    #     prompt=lambda state: apply_prompt_template('coder', state)
+    # code_act = create_codeact(
+    #     coder_llm, 
+    #     tools, 
+    #     eval,
+    #     lambda state: apply_prompt_template('coder', state)
     # )
+    # coder_agent = code_act.compile(checkpointer=MemorySaver())
+
+    coder_agent = create_react_agent(
+        coder_llm,
+        tools=tools,
+        prompt=lambda state: apply_prompt_template('coder', state)
+    )
 
     result = coder_agent.invoke(state)
     logger.info("Code agent completed task")

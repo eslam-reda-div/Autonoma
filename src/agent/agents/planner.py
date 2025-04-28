@@ -31,8 +31,11 @@ def planner_node(state: State) -> Command[Literal["supervisor", "__end__"]]:
                 f"Tavily search returned malformed response: {searched_content}"
             )
    
-    full_response = llm.invoke(messages)
-    full_response = full_response.content
+    stream = llm.stream(messages)
+    full_response = ""
+    for chunk in stream:
+        full_response += chunk.content
+    
     logger.debug(f"Current state messages: {state['messages']}")
     logger.debug(f"Planner response: {full_response}")
 
@@ -41,6 +44,8 @@ def planner_node(state: State) -> Command[Literal["supervisor", "__end__"]]:
 
     if full_response.endswith("```"):
         full_response = full_response.removesuffix("```")
+
+    # print(full_response)
 
     goto = "supervisor"
     try:

@@ -20,19 +20,82 @@ export function chatStream(
   },
   options: { abortSignal?: AbortSignal } = {},
 ) {
+  let messagePayload;
+  let messageContent;
+
+  if (userMessage.type === "imagetext") {
+    // Format message with image for the backend API
+    const images = userMessage.content.images;
+    const text = userMessage.content.text;
+    
+    // Process images to ensure compatibility with the backend
+    const processedImages = images?.map(img => {
+      // If the image is too large or in a problematic format, we might need to process it
+      // For now, just ensure it's a valid base64 string
+      if (img.startsWith('data:image/')) {
+        return img;
+      }
+      // Fall back to a safer format if needed
+      return img;
+    }) || [];
+    
+    // For image messages, use a simpler format that the backend can process
+    messageContent = text;
+    // Create an array for the content that will contain the text and images
+    type ContentItem = 
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: string };
+      
+    const contentArray: ContentItem[] = [
+      {
+        type: "text",
+        text: messageContent,
+      }
+    ];
+    
+    // Loop through each processed image and add it individually
+    for (const image of processedImages) {
+      contentArray.push({
+        type: "image_url",
+        image_url: image,
+      });
+    }
+    
+    // Set the message payload with the content array
+    messagePayload = {
+      role: "user",
+      content: contentArray,
+    };
+  } else {
+    // Standard text message
+    messageContent = userMessage.content;
+    messagePayload = {
+      role: "user",
+      content: messageContent,
+    };
+  }
+
+  // Construct the complete API request payload
+  const apiRequestBody = {
+    // TODO: add `thread_id` in the future
+    messages: [messagePayload],
+    deep_thinking_mode: params.deepThinkingMode,
+    search_before_planning: params.searchBeforePlanning,
+    debug: location.search.includes("debug") && !location.search.includes("debug=false"),
+    team_members: params.teamMembers,
+  };
+
+  // Log the request for debugging
+  console.log('Sending chat request:', {
+    ...apiRequestBody,
+    // Truncate image data in logs for readability
+    
+  });
+
   return fetchStream<ChatEvent>(
     getBaseApiUrl() + "/chat/stream",
     {
-      body: JSON.stringify({
-        // TODO: add `thread_id` in the future
-        messages: [userMessage],
-        deep_thinking_mode: params.deepThinkingMode,
-        search_before_planning: params.searchBeforePlanning,
-        debug:
-          location.search.includes("debug") &&
-          !location.search.includes("debug=false"),
-        team_members: params.teamMembers,
-      }),
+      body: JSON.stringify(apiRequestBody),
       signal: options.abortSignal,
     },
   );

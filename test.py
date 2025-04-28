@@ -93,5 +93,5 @@
 # from src.tools.browse_tools.browser import browser_tool
 
 # browser_tool.invoke({    
-# "instruction": "Please navigate to the official linkedin website and navegate to my connections page and send a connection request to the first person in the list"
+#     "instruction": "search for the latest news about AI and read some articles about it and summarize them for me", 
 # })

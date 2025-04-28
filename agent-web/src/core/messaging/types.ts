@@ -14,7 +14,12 @@ interface GenericMessage<
 
 export interface TextMessage extends GenericMessage<"text", string> {}
 
+export interface ImageTextMessage extends GenericMessage<"imagetext", {
+  text: string;
+  images: string[];
+}> {}
+
 export interface WorkflowMessage
   extends GenericMessage<"workflow", { workflow: Workflow }> {}
 
-export type Message = TextMessage | WorkflowMessage;
+export type Message = TextMessage | WorkflowMessage | ImageTextMessage;

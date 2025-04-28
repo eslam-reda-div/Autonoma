@@ -7,8 +7,6 @@ from src.utils.save_conversations import save_conversation
 from src.workflows.workflow import run_agent_workflow
 # from workflows.single_agent import run_agent_workflow
 
-from src.stt.whisper import stt
-
 load_dotenv()
 # save_graph()
 
@@ -23,7 +21,7 @@ if __name__ == "__main__":
     
             result = run_agent_workflow(
                 user_input=user_query, 
-                deep_thinking_mode=False,
+                deep_thinking_mode=True,
                 search_before_planning=False,
                 debug=False
             )

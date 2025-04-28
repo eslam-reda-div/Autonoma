@@ -8,6 +8,7 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { sendMessage, useInitTeamMembers, useStore } from "~/core/store";
 import { cn } from "~/core/utils";
+import { type MessageRole, type TextMessage, type ImageTextMessage } from "~/core/messaging/types";
 
 import { AppHeader } from "./_components/AppHeader";
 import { InputBox } from "./_components/InputBox";
@@ -23,18 +24,44 @@ export default function HomePage() {
   const handleSendMessage = useCallback(
     async (
       content: string,
-      config: { deepThinkingMode: boolean; searchBeforePlanning: boolean },
+      config: { 
+        deepThinkingMode: boolean; 
+        searchBeforePlanning: boolean; 
+        images?: string[] 
+      },
     ) => {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
-      await sendMessage(
-        {
+      
+      let message: TextMessage | ImageTextMessage;
+      
+      if (config.images && config.images.length > 0) {
+        // Message with images
+        message = {
           id: nanoid(),
-          role: "user",
+          role: "user" as MessageRole,
+          type: "imagetext",
+          content: {
+            text: content,
+            images: config.images
+          },
+        };
+      } else {
+        // Text only message
+        message = {
+          id: nanoid(),
+          role: "user" as MessageRole,
           type: "text",
           content,
+        };
+      }
+      
+      await sendMessage(
+        message,
+        {
+          deepThinkingMode: config.deepThinkingMode,
+          searchBeforePlanning: config.searchBeforePlanning,
         },
-        config,
         { abortSignal: abortController.signal },
       );
       abortControllerRef.current = null;

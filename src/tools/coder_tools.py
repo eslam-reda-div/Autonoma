@@ -49,4 +49,4 @@ for func_name in dir(math):
 tools = [
     bash_tool,
     python_repl_tool,
-] + math_tools
+]
