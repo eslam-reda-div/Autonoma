@@ -6,20 +6,25 @@ import {
   TooltipContent 
 } from "~/components/ui/tooltip";
 import { useApiUrlStore } from "~/core/api/api-url-store";
+import { useChatHistoryStore } from "~/core/store/chat-history-store";
 import { ApiIcon } from "~/core/icons";
+import { HistoryIcon } from "lucide-react";
 
 export function AppHeader() {
   const { setShowConfigModal } = useApiUrlStore();
+  const { toggleSidebar } = useChatHistoryStore();
 
   return (
     <div className="w-full flex justify-between items-center px-4">
-      <a
-        className="font-serif text-base md:text-lg font-extralight text-gray-500"
-        href="#"
-        target="_blank"
-      >
-        Autonoma
-      </a>
+      <div className="flex items-center gap-2">  
+        <a
+          className="font-serif text-base md:text-lg font-extralight text-gray-500"
+          href="#"
+          target="_blank"
+        >
+          Autonoma
+        </a>
+      </div>
       
       <Tooltip>
         <TooltipTrigger asChild>

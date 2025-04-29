@@ -31,10 +31,12 @@ if __name__ == "__main__":
                 role = message.type
                 print(f"\n[{role.upper()}] - [{message.name}]: {message.content}")
             print("\n")
+            
+            # Save the conversation after each interaction
+            save_conversation(result)
+            
         except KeyboardInterrupt:
             print("\nExiting voice assistant. Goodbye!")
             break
         except Exception as e:
             print(f"\nAn error occurred: {e}")
-            
-    # save_conversation(result)

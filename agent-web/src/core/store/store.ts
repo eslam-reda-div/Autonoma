@@ -25,7 +25,9 @@ export const useStore = create<{
   state: {
     messages: { role: string; content: string }[];
   };
-}>(() => ({
+  clearMessages: () => void;
+  setMessages: (messages: Message[]) => void;
+}>((set) => ({
   teamMembers: [],
   enabledTeamMembers: [],
   messages: [],
@@ -33,6 +35,8 @@ export const useStore = create<{
   state: {
     messages: [],
   },
+  clearMessages: () => set({ messages: [] }),
+  setMessages: (messages: Message[]) => set({ messages }),
 }));
 
 export function useInitTeamMembers() {

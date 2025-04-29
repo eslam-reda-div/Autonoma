@@ -1,18 +1,20 @@
 "use client";
 
 import { nanoid } from "nanoid";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { useAutoScrollToBottom } from "~/components/hooks/useAutoScrollToBottom";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { TooltipProvider } from "~/components/ui/tooltip";
 import { sendMessage, useInitTeamMembers, useStore } from "~/core/store";
+import { useChatHistoryStore } from "~/core/store/chat-history-store";
 import { cn } from "~/core/utils";
 import { type MessageRole, type TextMessage, type ImageTextMessage } from "~/core/messaging/types";
-
+import { getApiUrl } from "../core/api/api-url-store";
 import { AppHeader } from "./_components/AppHeader";
 import { InputBox } from "./_components/InputBox";
 import { MessageHistoryView } from "./_components/MessageHistoryView";
+import { ChatHistorySidebar } from "./_components/ChatHistorySidebar";
 
 export default function HomePage() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -20,6 +22,117 @@ export default function HomePage() {
 
   const messages = useStore((state) => state.messages);
   const responding = useStore((state) => state.responding);
+  const clearMessages = useStore((state) => state.clearMessages);
+  const setMessages = useStore((state) => state.setMessages);
+  
+  const { 
+    currentChatUuid, 
+    setCurrentChat,
+    loadChatHistory 
+  } = useChatHistoryStore();
+
+  // Effect to load chat when currentChatUuid changes
+  useEffect(() => {
+    if (currentChatUuid) {
+      // Load the selected chat
+      const loadChat = async () => {
+        try {
+          const response = await fetch(getApiUrl() + `/chat/history/${currentChatUuid}`);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to load chat: ${response.statusText}`);
+          }
+          
+          const chatData = await response.json();
+          
+          // Set the messages from the loaded chat
+          if (chatData && chatData.messages) {
+            setMessages(chatData.messages);
+          } else {
+            // If no messages found, clear the current chat
+            clearMessages();
+          }
+        } catch (error) {
+          console.error("Error loading chat:", error);
+          clearMessages();
+        }
+      };
+      
+      loadChat();
+    } else {
+      // Clear messages when creating a new chat
+      clearMessages();
+    }
+  }, [currentChatUuid, clearMessages, setMessages]);
+
+  // Save chat after receiving response or when sending a new message
+  useEffect(() => {
+    const saveCurrentChat = async () => {
+      // Don't save if there are no messages or if we're still responding
+      if (messages.length === 0 || responding) return;
+      
+      try {
+        // Prepare chat data to save
+        const firstUserMessage = messages.find(m => m.role === "user");
+        const title = firstUserMessage 
+          ? firstUserMessage.content.toString().substring(0, 50) 
+          : "New Chat";
+          
+        const chatData = {
+          title: title + (title.length >= 50 ? "..." : ""),
+          messages: messages,
+          args: {
+            is_favorite: false,
+            tags: [],
+          }
+        };
+        
+        // If we have a current chat UUID, update it, otherwise create a new one
+        if (currentChatUuid) {
+          console.log(chatData);
+          
+          await fetch(getApiUrl() + `/chat/history/${currentChatUuid}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(chatData)
+          });
+        } else {
+          console.log(chatData);
+          const response = await fetch(getApiUrl() + `/chat/save`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(chatData)
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.uuid) {
+              setCurrentChat(data.uuid);
+            }
+          }
+        }
+        
+        // Refresh the chat history list after saving
+        loadChatHistory();
+        
+      } catch (error) {
+        console.error("Error saving chat:", error);
+      }
+    };
+    
+    // Save when messages change and we're not responding
+    if (!responding && messages.length > 0) {
+      const timer = setTimeout(() => {
+        saveCurrentChat();
+      }, 1000); // Add a small delay to avoid saving too frequently
+      
+      return () => clearTimeout(timer);
+    }
+  }, [messages, responding, currentChatUuid, setCurrentChat, loadChatHistory]);
 
   const handleSendMessage = useCallback(
     async (
@@ -74,6 +187,9 @@ export default function HomePage() {
 
   return (
     <TooltipProvider delayDuration={150}>
+      {/* Add ChatHistorySidebar to the page */}
+      <ChatHistorySidebar />
+      
       <ScrollArea className="h-screen w-full" ref={scrollAreaRef}>
         <div className="flex min-h-screen flex-col items-center">
           <header className="sticky top-0 right-0 left-0 z-10 flex h-16 w-full items-center px-4 backdrop-blur-sm">

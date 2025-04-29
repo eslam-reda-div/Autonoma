@@ -29,10 +29,12 @@ load_dotenv()
 BROWSER_HISTORY_DIR = os.getenv("BROWSER_HISTORY_DIR", "history/browser_history")
 CHAT_HISTORY_DIR = os.getenv("CHAT_HISTORY_DIR", "history/chat_history")
 CHAT_FOLDERS_DIR = os.path.join(CHAT_HISTORY_DIR, "folders")
+CHAT_GLOBAL_DIR = os.path.join(CHAT_HISTORY_DIR, "global")
 
 # Ensure directories exist
 os.makedirs(CHAT_HISTORY_DIR, exist_ok=True)
 os.makedirs(CHAT_FOLDERS_DIR, exist_ok=True)
+os.makedirs(CHAT_GLOBAL_DIR, exist_ok=True)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -110,6 +112,30 @@ class AssignChatToFolderRequest(BaseModel):
 class BulkChatOperation(BaseModel):
     """Request model for bulk operations on chats"""
     chat_uuids: List[str] = Field(..., description="List of chat UUIDs to operate on")
+
+
+class MoveChatRequest(BaseModel):
+    """Request to move a chat between folders or to/from global"""
+    destination: str = Field(..., description="The destination ('global' or folder ID)")
+
+
+class MessageItem(BaseModel):
+    """Single message in a chat"""
+    id: str = Field(..., description="Unique ID of the message")
+    role: str = Field(..., description="Role of the message sender (user or assistant)")
+    type: str = Field(..., description="Type of the message (text, imagetext, etc.)")
+    content: Union[str, Dict[str, Any], List[Dict[str, Any]]] = Field(
+        ..., 
+        description="Content of the message, can be a string for text messages, an object for complex messages, or a list of content items for messages with multiple parts (text and images)"
+    )
+
+
+class SaveChatRequest(BaseModel):
+    """Request model for saving a chat history"""
+    title: str = Field(..., description="The title of the chat")
+    messages: List[MessageItem] = Field(..., description="List of messages in the chat")
+    args: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional arguments for the chat")
+    folder_id: Optional[str] = Field(None, description="Optional ID of the folder to save the chat in")
 
 
 @app.post("/api/chat/stream")
@@ -233,24 +259,18 @@ class ChatHistoryArgs(BaseModel):
     """Arguments for saving a chat history"""
     title: str = Field(..., description="The title of the chat")
     uuid: Optional[str] = Field(None, description="Custom UUID for the chat (generated if not provided)")
-    created_at: Optional[datetime] = Field(None, description="When the chat was created")
-    updated_at: Optional[datetime] = Field(None, description="When the chat was last updated")
+    created_at: Optional[Union[datetime, str]] = Field(None, description="When the chat was created")
+    updated_at: Optional[Union[datetime, str]] = Field(None, description="When the chat was last updated")
     model: Optional[str] = Field(None, description="The model used for the chat")
-    is_pinned: Optional[bool] = Field(False, description="Whether the chat is pinned")
     is_favorite: Optional[bool] = Field(False, description="Whether the chat is favorited")
     tags: Optional[List[str]] = Field(default_factory=list, description="Tags associated with this chat")
 
 
-class SaveChatRequest(BaseModel):
-    """Request model for saving a chat history"""
-    args: ChatHistoryArgs = Field(..., description="Arguments for the chat history")
-    chat: Any = Field(..., description="The chat content to save")
-
-
 class UpdateChatRequest(BaseModel):
     """Request model for updating a chat history"""
-    args: Optional[ChatHistoryArgs] = Field(None, description="Updated arguments for the chat history")
-    chat: Optional[Any] = Field(None, description="Updated chat content")
+    title: Optional[str] = Field(None, description="The title of the chat")
+    messages: Optional[List[MessageItem]] = Field(None, description="List of messages in the chat")
+    args: Optional[Dict[str, Any]] = Field(None, description="Additional arguments for the chat")
 
 
 class ChatHistoryItem(BaseModel):
@@ -265,56 +285,84 @@ async def save_chat_history(request: SaveChatRequest):
     Save a chat history to a JSON file.
     
     Args:
-        request: The SaveChatRequest containing chat args and content
+        request: The SaveChatRequest containing chat title, messages and arguments
         
     Returns:
         dict: A dictionary with the UUID of the saved chat
     """
     try:
-        # Generate UUID if not provided
-        chat_uuid = request.args.uuid or str(uuid.uuid4())
+        # Generate UUID if not provided in args
+        chat_uuid = str(uuid.uuid4())
         
-        # Create the folder path
-        folder_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid)
-        os.makedirs(folder_path, exist_ok=True)
+        # Determine if this is a global chat or in a folder
+        folder_id = request.folder_id
+        
+        if folder_id:
+            # Verify the folder exists
+            folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_id)
+            if not os.path.exists(folder_path):
+                # Create the folder if it doesn't exist with a default index.json
+                os.makedirs(folder_path, exist_ok=True)
+                index_data = {
+                    "folder_id": folder_id,
+                    "name": f"Folder {folder_id[:8]}",
+                    "created_at": datetime.now().isoformat()
+                }
+                with open(os.path.join(folder_path, "index.json"), "w", encoding="utf-8") as f:
+                    json.dump(index_data, f, ensure_ascii=False, indent=2)
+            
+            # Create the chat folder inside the folder
+            chat_folder_path = os.path.join(folder_path, chat_uuid)
+        else:
+            # Global chat (not in any folder)
+            chat_folder_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid)
+        
+        # Create the chat folder
+        os.makedirs(chat_folder_path, exist_ok=True)
         
         # Create the file path
-        file_path = os.path.join(folder_path, "chat.json")
+        chat_file_path = os.path.join(chat_folder_path, "chat.json")
         
         # Set timestamps
         now = datetime.now().isoformat()
-        created_at = request.args.created_at.isoformat() if request.args.created_at else now
-        updated_at = request.args.updated_at.isoformat() if request.args.updated_at else now
+        
+        # Extract args from request
+        is_favorite = request.args.get("is_favorite", False)
+        tags = request.args.get("tags", [])
         
         # Prepare data to save
         save_data = {
             "args": {
-                "title": request.args.title,
+                "title": request.title,
                 "uuid": chat_uuid,
-                "created_at": created_at,
-                "updated_at": updated_at,
-                "model": request.args.model or "default",
-                "is_pinned": request.args.is_pinned,
-                "is_favorite": request.args.is_favorite,
-                "tags": request.args.tags
+                "created_at": now,
+                "updated_at": now,
+                "model": "default",
+                "is_favorite": is_favorite,
+                "tags": tags
             },
-            "chat": request.chat
+            "messages": [message.dict() for message in request.messages]
         }
         
         # Save to JSON file
-        with open(file_path, "w", encoding="utf-8") as f:
+        with open(chat_file_path, "w", encoding="utf-8") as f:
             json.dump(save_data, f, ensure_ascii=False, indent=2)
         
-        return {"uuid": chat_uuid, "status": "success"}
+        return {"uuid": chat_uuid, "status": "success", "folder_id": folder_id}
     except Exception as e:
         logger.error(f"Error saving chat history: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/chat/history")
-async def list_chat_history():
+async def list_chat_history(folder_id: Optional[str] = None):
     """
     Get a list of all saved chats.
+    
+    Args:
+        folder_id: Optional folder ID to filter chats from a specific folder
+                  If 'global', returns only global chats
+                  If None, returns all chats
     
     Returns:
         list: A list of ChatHistoryItem objects with title and UUID
@@ -322,25 +370,96 @@ async def list_chat_history():
     try:
         result = []
         
-        # Get all folders in the chat history directory
-        folders = [f for f in os.listdir(CHAT_FOLDERS_DIR) if os.path.isdir(os.path.join(CHAT_FOLDERS_DIR, f))]
-        
-        for folder_name in folders:
-            file_path = os.path.join(CHAT_FOLDERS_DIR, folder_name, "chat.json")
+        # Get global chats if requested or if no folder specified
+        if folder_id is None or folder_id == "global":
+            # List global chats (chats not in any folder)
+            global_chat_dirs = [d for d in os.listdir(CHAT_GLOBAL_DIR) 
+                              if os.path.isdir(os.path.join(CHAT_GLOBAL_DIR, d))]
             
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    chat_data = json.load(f)
+            for chat_uuid in global_chat_dirs:
+                file_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid, "chat.json")
+                
+                if os.path.exists(file_path):
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            chat_data = json.load(f)
+                            
+                        # Extract title and UUID
+                        if "args" in chat_data and "title" in chat_data["args"]:
+                            title = chat_data["args"]["title"]
+                            chat_uuid = chat_data["args"]["uuid"]
+                            created_at = chat_data["args"]["created_at"]
+                            is_favorite = chat_data["args"]["is_favorite"]
+                            
+                            result.append({
+                                "title": title, 
+                                "uuid": chat_uuid,
+                                "location": "global",
+                                "created_at": created_at,
+                                "is_favorite": is_favorite,
+                            })
+                    except Exception as e:
+                        logger.warning(f"Error reading global chat file {file_path}: {e}")
+                        continue
+        
+        # Get folder chats if no specific folder requested or if specific folder requested
+        if folder_id is None or (folder_id != "global" and folder_id is not None):
+            # List folders in the folders directory
+            if folder_id is None:
+                # Get all folders
+                folder_dirs = [d for d in os.listdir(CHAT_FOLDERS_DIR) 
+                             if os.path.isdir(os.path.join(CHAT_FOLDERS_DIR, d))]
+            else:
+                # Get specific folder
+                folder_dirs = [folder_id] if os.path.isdir(os.path.join(CHAT_FOLDERS_DIR, folder_id)) else []
+            
+            for folder_name in folder_dirs:
+                folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+                
+                # Get folder name from index.json
+                folder_info = {"name": folder_name, "folder_id": folder_name}
+                index_path = os.path.join(folder_path, "index.json")
+                if os.path.exists(index_path):
+                    try:
+                        with open(index_path, "r", encoding="utf-8") as f:
+                            folder_info = json.load(f)
+                    except Exception as e:
+                        logger.warning(f"Error reading folder index file {index_path}: {e}")
+                
+                # Get all chat directories in this folder
+                chat_dirs = [d for d in os.listdir(folder_path) 
+                           if os.path.isdir(os.path.join(folder_path, d)) and d != "index.json"]
+                
+                for chat_uuid in chat_dirs:
+                    chat_file_path = os.path.join(folder_path, chat_uuid, "chat.json")
                     
-                # Extract title and UUID
-                if "args" in chat_data and "title" in chat_data["args"]:
-                    title = chat_data["args"]["title"]
-                    chat_uuid = chat_data["args"]["uuid"]
-                    
-                    result.append(ChatHistoryItem(title=title, uuid=chat_uuid))
-            except Exception as e:
-                logger.warning(f"Error reading chat history file {file_path}: {e}")
-                continue
+                    if os.path.exists(chat_file_path):
+                        try:
+                            with open(chat_file_path, "r", encoding="utf-8") as f:
+                                chat_data = json.load(f)
+                                
+                            # Extract title and UUID
+                            if "args" in chat_data and "title" in chat_data["args"]:
+                                title = chat_data["args"]["title"]
+                                chat_uuid = chat_data["args"]["uuid"]
+                                created_at = chat_data["args"]["created_at"]
+                                is_favorite = chat_data["args"]["is_favorite"]
+                            
+                                result.append({
+                                    "title": title, 
+                                    "uuid": chat_uuid,
+                                    "location": "folder",
+                                    "folder_id": folder_name,
+                                    "folder_name": folder_info.get("name", folder_name),
+                                    "created_at": created_at,
+                                    "is_favorite": is_favorite,       
+                                })
+                        except Exception as e:
+                            logger.warning(f"Error reading folder chat file {chat_file_path}: {e}")
+                            continue
+        
+        # Sort by updated_at (newest first)
+        result.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
         
         return {"history": result}
     except Exception as e:
@@ -360,15 +479,45 @@ async def get_chat_history(chat_uuid: str):
         dict: The full chat history data
     """
     try:
-        file_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid, "chat.json")
+        # First, check in global chats
+        global_chat_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid, "chat.json")
         
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
+        if os.path.exists(global_chat_path):
+            with open(global_chat_path, "r", encoding="utf-8") as f:
+                chat_data = json.load(f)
+            chat_data["location"] = "global"
+            return chat_data
         
-        with open(file_path, "r", encoding="utf-8") as f:
-            chat_data = json.load(f)
+        # If not found in global, search in folders
+        for folder_name in os.listdir(CHAT_FOLDERS_DIR):
+            folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+            
+            if not os.path.isdir(folder_path):
+                continue
+                
+            chat_path = os.path.join(folder_path, chat_uuid, "chat.json")
+            
+            if os.path.exists(chat_path):
+                with open(chat_path, "r", encoding="utf-8") as f:
+                    chat_data = json.load(f)
+                
+                # Get folder info
+                folder_info = {"name": folder_name, "folder_id": folder_name}
+                index_path = os.path.join(folder_path, "index.json")
+                if os.path.exists(index_path):
+                    try:
+                        with open(index_path, "r", encoding="utf-8") as f:
+                            folder_info = json.load(f)
+                    except Exception as e:
+                        logger.warning(f"Error reading folder index: {e}")
+                
+                chat_data["location"] = "folder"
+                chat_data["folder_id"] = folder_name
+                chat_data["folder_name"] = folder_info.get("name", folder_name)
+                return chat_data
         
-        return chat_data
+        # If we get here, the chat wasn't found
+        raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
     except HTTPException:
         raise
     except Exception as e:
@@ -389,39 +538,225 @@ async def update_chat_history(chat_uuid: str, request: UpdateChatRequest):
         dict: A dictionary with the status of the update operation
     """
     try:
-        file_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid, "chat.json")
         
-        if not os.path.exists(file_path):
+        # Find the chat location (global or in a folder)
+        chat_file_path = None
+        location = None
+        folder_id = None
+        
+        # Check global first
+        global_chat_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid, "chat.json")
+        if os.path.exists(global_chat_path):
+            chat_file_path = global_chat_path
+            location = "global"
+        else:
+            # Search in folders
+            for folder_name in os.listdir(CHAT_FOLDERS_DIR):
+                folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+                
+                if not os.path.isdir(folder_path):
+                    continue
+                    
+                potential_path = os.path.join(folder_path, chat_uuid, "chat.json")
+                
+                if os.path.exists(potential_path):
+                    chat_file_path = potential_path
+                    location = "folder"
+                    folder_id = folder_name
+                    break
+        
+        if not chat_file_path:
             raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
         
         # Read existing data
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(chat_file_path, "r", encoding="utf-8") as f:
             existing_data = json.load(f)
         
         # Update the data with new values if provided
+        if request.title:
+            existing_data["args"]["title"] = request.title
+            
+        if request.messages is not None:
+            # Convert Pydantic models to dictionaries
+            existing_data["messages"] = [message.dict() for message in request.messages]
+            
         if request.args:
-            # Keep the UUID constant, only update the title
-            if request.args.title:
-                existing_data["args"]["title"] = request.args.title
-            if request.args.is_pinned is not None:
-                existing_data["args"]["is_pinned"] = request.args.is_pinned
-            if request.args.is_favorite is not None:
-                existing_data["args"]["is_favorite"] = request.args.is_favorite
-            if request.args.tags is not None:
-                existing_data["args"]["tags"] = request.args.tags
+            # Update with new args if provided
+            existing_data["args"].update(request.args)
         
-        if request.chat is not None:
-            existing_data["chat"] = request.chat
+        # Update the timestamp
+        existing_data["args"]["updated_at"] = datetime.now().isoformat()
         
         # Save updated data back to file
-        with open(file_path, "w", encoding="utf-8") as f:
+        with open(chat_file_path, "w", encoding="utf-8") as f:
             json.dump(existing_data, f, ensure_ascii=False, indent=2)
         
-        return {"uuid": chat_uuid, "status": "updated"}
+        return {
+            "uuid": chat_uuid, 
+            "status": "updated",
+            "location": location,
+            "folder_id": folder_id
+        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating chat history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/chat/history/{chat_uuid}/favorite")
+async def favorite_chat(chat_uuid: str, favorite_status: bool = True):
+    """
+    Favorite or unfavorite a chat.
+    
+    Args:
+        chat_uuid: The UUID of the chat to favorite/unfavorite
+        favorite_status: Whether to favorite (True) or unfavorite (False) the chat
+        
+    Returns:
+        dict: A dictionary with the status of the operation
+    """
+    try:
+        # Find the chat location (global or in a folder)
+        chat_file_path = None
+        location = None
+        folder_id = None
+        
+        # Check global first
+        global_chat_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid, "chat.json")
+        if os.path.exists(global_chat_path):
+            chat_file_path = global_chat_path
+            location = "global"
+        else:
+            # Search in folders
+            for folder_name in os.listdir(CHAT_FOLDERS_DIR):
+                folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+                
+                if not os.path.isdir(folder_path):
+                    continue
+                    
+                potential_path = os.path.join(folder_path, chat_uuid, "chat.json")
+                
+                if os.path.exists(potential_path):
+                    chat_file_path = potential_path
+                    location = "folder"
+                    folder_id = folder_name
+                    break
+        
+        if not chat_file_path:
+            raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
+        
+        # Read existing data
+        with open(chat_file_path, "r", encoding="utf-8") as f:
+            existing_data = json.load(f)
+        
+        # Update favorite status
+        existing_data["args"]["is_favorite"] = favorite_status
+        existing_data["args"]["updated_at"] = datetime.now().isoformat()
+        
+        # Save updated data back to file
+        with open(chat_file_path, "w", encoding="utf-8") as f:
+            json.dump(existing_data, f, ensure_ascii=False, indent=2)
+        
+        return {
+            "uuid": chat_uuid, 
+            "is_favorite": favorite_status, 
+            "status": "updated",
+            "location": location,
+            "folder_id": folder_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating favorite status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/chat/move/{chat_uuid}")
+async def move_chat(chat_uuid: str, request: MoveChatRequest):
+    """
+    Move a chat between folders or to/from global.
+    
+    Args:
+        chat_uuid: The UUID of the chat to move
+        request: The MoveChatRequest containing the destination
+        
+    Returns:
+        dict: A dictionary with the status of the move operation
+    """
+    try:
+        # Find the chat location (global or in a folder)
+        source_path = None
+        destination_path = None
+        location = None
+        source_folder_id = None
+        
+        # Check global first
+        global_chat_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid)
+        if os.path.exists(global_chat_path):
+            source_path = global_chat_path
+            location = "global"
+        else:
+            # Search in folders
+            for folder_name in os.listdir(CHAT_FOLDERS_DIR):
+                folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+                
+                if not os.path.isdir(folder_path):
+                    continue
+                    
+                potential_path = os.path.join(folder_path, chat_uuid)
+                
+                if os.path.exists(potential_path):
+                    source_path = potential_path
+                    location = "folder"
+                    source_folder_id = folder_name
+                    break
+        
+        if not source_path:
+            raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
+        
+        # Determine destination path
+        if request.destination == "global":
+            destination_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid)
+        else:
+            # Verify the destination folder exists
+            folder_path = os.path.join(CHAT_FOLDERS_DIR, request.destination)
+            if not os.path.exists(folder_path):
+                # Create the folder if it doesn't exist with a default index.json
+                os.makedirs(folder_path, exist_ok=True)
+                index_data = {
+                    "folder_id": request.destination,
+                    "name": f"Folder {request.destination[:8]}",
+                    "created_at": datetime.now().isoformat()
+                }
+                with open(os.path.join(folder_path, "index.json"), "w", encoding="utf-8") as f:
+                    json.dump(index_data, f, ensure_ascii=False, indent=2)
+            
+            destination_path = os.path.join(folder_path, chat_uuid)
+        
+        # Move the chat if it's not already at the destination
+        if os.path.normpath(source_path) != os.path.normpath(destination_path):
+            # Make sure destination doesn't already exist
+            if os.path.exists(destination_path):
+                shutil.rmtree(destination_path)
+            
+            # Copy the chat folder to the destination
+            shutil.copytree(source_path, destination_path)
+            
+            # Remove the source folder
+            shutil.rmtree(source_path)
+        
+        return {
+            "uuid": chat_uuid,
+            "status": "moved",
+            "from": {"location": location, "folder_id": source_folder_id},
+            "to": {"location": "global" if request.destination == "global" else "folder", 
+                  "folder_id": None if request.destination == "global" else request.destination}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error moving chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -437,15 +772,44 @@ async def delete_chat_history(chat_uuid: str):
         dict: A dictionary with the status of the delete operation
     """
     try:
-        folder_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid)
+        # Find the chat location (global or in a folder)
+        location = None
+        folder_id = None
+        path_to_delete = None
         
-        if not os.path.exists(folder_path):
+        # Check global first
+        global_chat_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid)
+        if os.path.exists(global_chat_path):
+            path_to_delete = global_chat_path
+            location = "global"
+        else:
+            # Search in folders
+            for folder_name in os.listdir(CHAT_FOLDERS_DIR):
+                folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+                
+                if not os.path.isdir(folder_path):
+                    continue
+                    
+                potential_path = os.path.join(folder_path, chat_uuid)
+                
+                if os.path.exists(potential_path):
+                    path_to_delete = potential_path
+                    location = "folder"
+                    folder_id = folder_name
+                    break
+        
+        if not path_to_delete:
             raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
         
-        # Delete the folder and its contents
-        shutil.rmtree(folder_path)
+        # Delete the chat folder
+        shutil.rmtree(path_to_delete)
         
-        return {"uuid": chat_uuid, "status": "deleted"}
+        return {
+            "uuid": chat_uuid,
+            "status": "deleted",
+            "location": location,
+            "folder_id": folder_id
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -466,30 +830,27 @@ async def create_folder(request: CreateFolderRequest):
     """
     try:
         folder_id = str(uuid.uuid4())
+        folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_id)
         
-        # Create the folder metadata file
-        folder_metadata_path = os.path.join(CHAT_FOLDERS_DIR, "folders.json")
+        # Create the folder
+        os.makedirs(folder_path, exist_ok=True)
         
-        # Load existing folders or create new list
-        if os.path.exists(folder_metadata_path):
-            with open(folder_metadata_path, "r", encoding="utf-8") as f:
-                folders = json.load(f)
-        else:
-            folders = []
-        
-        # Add new folder
-        new_folder = {
-            "name": request.name,
+        # Create folder index.json
+        folder_data = {
             "folder_id": folder_id,
+            "name": request.name,
             "created_at": datetime.now().isoformat()
         }
-        folders.append(new_folder)
         
-        # Save updated folder list
-        with open(folder_metadata_path, "w", encoding="utf-8") as f:
-            json.dump(folders, f, ensure_ascii=False, indent=2)
+        with open(os.path.join(folder_path, "index.json"), "w", encoding="utf-8") as f:
+            json.dump(folder_data, f, ensure_ascii=False, indent=2)
         
-        return {"folder_id": folder_id, "name": request.name, "status": "created"}
+        return {
+            "folder_id": folder_id,
+            "name": request.name,
+            "created_at": folder_data["created_at"],
+            "status": "created"
+        }
     except Exception as e:
         logger.error(f"Error creating folder: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -504,151 +865,189 @@ async def list_folders():
         list: A list of folder objects
     """
     try:
-        folder_metadata_path = os.path.join(CHAT_FOLDERS_DIR, "folders.json")
+        result = []
         
-        if not os.path.exists(folder_metadata_path):
-            return {"folders": []}
+        # List all folders
+        folder_dirs = [d for d in os.listdir(CHAT_FOLDERS_DIR) 
+                     if os.path.isdir(os.path.join(CHAT_FOLDERS_DIR, d))]
         
-        with open(folder_metadata_path, "r", encoding="utf-8") as f:
-            folders = json.load(f)
+        for folder_id in folder_dirs:
+            folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_id)
+            index_path = os.path.join(folder_path, "index.json")
+            
+            # Read folder metadata
+            if os.path.exists(index_path):
+                try:
+                    with open(index_path, "r", encoding="utf-8") as f:
+                        folder_data = json.load(f)
+                        
+                    # Count chats in this folder
+                    chat_count = len([d for d in os.listdir(folder_path) 
+                                   if os.path.isdir(os.path.join(folder_path, d)) and d != "index.json"])
+                    
+                    result.append({
+                        "folder_id": folder_data.get("folder_id", folder_id),
+                        "name": folder_data.get("name", f"Folder {folder_id[:8]}"),
+                        "created_at": folder_data.get("created_at", ""),
+                        "chat_count": chat_count
+                    })
+                except Exception as e:
+                    logger.warning(f"Error reading folder metadata: {e}")
+                    # Add basic info for the folder
+                    result.append({
+                        "folder_id": folder_id,
+                        "name": f"Folder {folder_id[:8]}",
+                        "created_at": "",
+                        "chat_count": 0
+                    })
+            else:
+                # Folder exists but has no index.json
+                # Create a default index.json
+                folder_data = {
+                    "folder_id": folder_id,
+                    "name": f"Folder {folder_id[:8]}",
+                    "created_at": datetime.now().isoformat()
+                }
+                
+                with open(index_path, "w", encoding="utf-8") as f:
+                    json.dump(folder_data, f, ensure_ascii=False, indent=2)
+                
+                # Count chats in this folder
+                chat_count = len([d for d in os.listdir(folder_path) 
+                               if os.path.isdir(os.path.join(folder_path, d))])
+                
+                result.append({
+                    "folder_id": folder_id,
+                    "name": folder_data["name"],
+                    "created_at": folder_data["created_at"],
+                    "chat_count": chat_count
+                })
         
-        return {"folders": folders}
+        # Sort by name
+        result.sort(key=lambda x: x.get("name", ""))
+        
+        return {"folders": result}
     except Exception as e:
         logger.error(f"Error listing folders: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.put("/api/chat/history/{chat_uuid}/folder")
-async def assign_chat_to_folder(chat_uuid: str, request: AssignChatToFolderRequest):
+@app.put("/api/chat/folders/{folder_id}")
+async def update_folder(folder_id: str, request: CreateFolderRequest):
     """
-    Assign a chat to a folder.
+    Update a folder's name.
     
     Args:
-        chat_uuid: The UUID of the chat to assign
-        request: The request containing the folder ID
+        folder_id: The ID of the folder to update
+        request: The request containing the new folder name
         
     Returns:
-        dict: A dictionary with the status of the operation
+        dict: A dictionary with the updated folder info
     """
     try:
-        chat_file_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid, "chat.json")
+        folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_id)
+        index_path = os.path.join(folder_path, "index.json")
         
-        if not os.path.exists(chat_file_path):
-            raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
+        if not os.path.exists(folder_path):
+            raise HTTPException(status_code=404, detail=f"Folder with ID {folder_id} not found")
         
-        # Verify the folder exists
-        folder_metadata_path = os.path.join(CHAT_FOLDERS_DIR, "folders.json")
+        # Read existing folder data
+        if os.path.exists(index_path):
+            with open(index_path, "r", encoding="utf-8") as f:
+                folder_data = json.load(f)
+        else:
+            folder_data = {
+                "folder_id": folder_id,
+                "created_at": datetime.now().isoformat()
+            }
         
-        if not os.path.exists(folder_metadata_path):
-            raise HTTPException(status_code=404, detail="No folders exist")
+        # Update folder name
+        folder_data["name"] = request.name
+        folder_data["updated_at"] = datetime.now().isoformat()
         
-        with open(folder_metadata_path, "r", encoding="utf-8") as f:
-            folders = json.load(f)
+        # Save updated data
+        with open(index_path, "w", encoding="utf-8") as f:
+            json.dump(folder_data, f, ensure_ascii=False, indent=2)
         
-        # Check if the folder exists
-        folder_exists = any(folder["folder_id"] == request.folder_id for folder in folders)
-        if not folder_exists:
-            raise HTTPException(status_code=404, detail=f"Folder with ID {request.folder_id} not found")
-        
-        # Update the chat's folder assignment
-        folder_assignment_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid, "folder.json")
-        
-        with open(folder_assignment_path, "w", encoding="utf-8") as f:
-            json.dump({"folder_id": request.folder_id}, f, ensure_ascii=False, indent=2)
-        
-        return {"uuid": chat_uuid, "folder_id": request.folder_id, "status": "assigned"}
+        return {
+            "folder_id": folder_id,
+            "name": request.name,
+            "status": "updated"
+        }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error assigning chat to folder: {e}")
+        logger.error(f"Error updating folder: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.put("/api/chat/history/{chat_uuid}/pin")
-async def pin_chat(chat_uuid: str, pin_status: bool = True):
+@app.delete("/api/chat/folders/{folder_id}")
+async def delete_folder(folder_id: str, delete_chats: bool = False):
     """
-    Pin or unpin a chat.
+    Delete a folder. If delete_chats is True, delete all chats in the folder.
+    Otherwise, move all chats to global.
     
     Args:
-        chat_uuid: The UUID of the chat to pin/unpin
-        pin_status: Whether to pin (True) or unpin (False) the chat
+        folder_id: The ID of the folder to delete
+        delete_chats: Whether to delete all chats in the folder
         
     Returns:
-        dict: A dictionary with the status of the operation
+        dict: A dictionary with the status of the delete operation
     """
     try:
-        file_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid, "chat.json")
+        folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_id)
         
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
+        if not os.path.exists(folder_path):
+            raise HTTPException(status_code=404, detail=f"Folder with ID {folder_id} not found")
         
-        # Read existing data
-        with open(file_path, "r", encoding="utf-8") as f:
-            existing_data = json.load(f)
+        # Get all chat directories in this folder
+        chat_dirs = [d for d in os.listdir(folder_path) 
+                   if os.path.isdir(os.path.join(folder_path, d)) and d != "index.json"]
         
-        # Update pin status
-        existing_data["args"]["is_pinned"] = pin_status
-        existing_data["args"]["updated_at"] = datetime.now().isoformat()
+        if delete_chats:
+            # Delete all chats in the folder
+            for chat_uuid in chat_dirs:
+                chat_path = os.path.join(folder_path, chat_uuid)
+                if os.path.exists(chat_path):
+                    shutil.rmtree(chat_path)
+        else:
+            # Move all chats to global
+            for chat_uuid in chat_dirs:
+                source_path = os.path.join(folder_path, chat_uuid)
+                destination_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid)
+                
+                if os.path.exists(source_path):
+                    # Handle case where destination already exists
+                    if os.path.exists(destination_path):
+                        shutil.rmtree(destination_path)
+                    
+                    # Move chat to global
+                    shutil.copytree(source_path, destination_path)
         
-        # Save updated data back to file
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(existing_data, f, ensure_ascii=False, indent=2)
+        # Delete the folder
+        shutil.rmtree(folder_path)
         
-        return {"uuid": chat_uuid, "is_pinned": pin_status, "status": "updated"}
+        return {
+            "folder_id": folder_id,
+            "status": "deleted",
+            "chats_deleted": delete_chats,
+            "chats_moved": not delete_chats
+        }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating pin status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.put("/api/chat/history/{chat_uuid}/favorite")
-async def favorite_chat(chat_uuid: str, favorite_status: bool = True):
-    """
-    Favorite or unfavorite a chat.
-    
-    Args:
-        chat_uuid: The UUID of the chat to favorite/unfavorite
-        favorite_status: Whether to favorite (True) or unfavorite (False) the chat
-        
-    Returns:
-        dict: A dictionary with the status of the operation
-    """
-    try:
-        file_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid, "chat.json")
-        
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
-        
-        # Read existing data
-        with open(file_path, "r", encoding="utf-8") as f:
-            existing_data = json.load(f)
-        
-        # Update favorite status
-        existing_data["args"]["is_favorite"] = favorite_status
-        existing_data["args"]["updated_at"] = datetime.now().isoformat()
-        
-        # Save updated data back to file
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(existing_data, f, ensure_ascii=False, indent=2)
-        
-        return {"uuid": chat_uuid, "is_favorite": favorite_status, "status": "updated"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating favorite status: {e}")
+        logger.error(f"Error deleting folder: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/chat/search")
-async def search_chats(query: str = "", folder_id: Optional[str] = None, filter_pinned: bool = False, filter_favorites: bool = False, filter_tags: Optional[List[str]] = None):
+async def search_chats(query: str = "", folder_id: Optional[str] = None, filter_favorites: bool = False, filter_tags: Optional[List[str]] = None):
     """
     Search through chat history.
     
     Args:
         query: The search query string
-        folder_id: Optional filter by folder ID
-        filter_pinned: Whether to filter for pinned chats only
+        folder_id: Optional filter by folder ID ('global' for global chats)
         filter_favorites: Whether to filter for favorite chats only
         filter_tags: Optional list of tags to filter by
         
@@ -658,78 +1057,149 @@ async def search_chats(query: str = "", folder_id: Optional[str] = None, filter_
     try:
         result = []
         
-        # Get all folders in the chat history directory
-        folders = [f for f in os.listdir(CHAT_FOLDERS_DIR) if os.path.isdir(os.path.join(CHAT_FOLDERS_DIR, f))]
+        # Determine which locations to search
+        search_global = folder_id is None or folder_id == "global"
+        search_folders = folder_id is None or (folder_id != "global" and folder_id is not None)
         
-        for folder_name in folders:
-            # Skip if not a UUID directory
-            if folder_name == "folders":
-                continue
-                
-            chat_file_path = os.path.join(CHAT_FOLDERS_DIR, folder_name, "chat.json")
+        # Search in global chats
+        if search_global:
+            global_chat_dirs = [d for d in os.listdir(CHAT_GLOBAL_DIR) 
+                              if os.path.isdir(os.path.join(CHAT_GLOBAL_DIR, d))]
             
-            if not os.path.exists(chat_file_path):
-                continue
+            for chat_uuid in global_chat_dirs:
+                chat_file_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid, "chat.json")
                 
-            try:
-                # Check if this chat belongs to the specified folder
-                if folder_id:
-                    folder_assignment_path = os.path.join(CHAT_FOLDERS_DIR, folder_name, "folder.json")
-                    if not os.path.exists(folder_assignment_path):
+                if not os.path.exists(chat_file_path):
+                    continue
+                    
+                try:
+                    with open(chat_file_path, "r", encoding="utf-8") as f:
+                        chat_data = json.load(f)
+                    
+                    # Apply filters
+                    if filter_favorites and not chat_data.get("args", {}).get("is_favorite", False):
                         continue
                         
-                    with open(folder_assignment_path, "r", encoding="utf-8") as f:
-                        folder_data = json.load(f)
-                        if folder_data.get("folder_id") != folder_id:
+                    if filter_tags:
+                        chat_tags = chat_data.get("args", {}).get("tags", [])
+                        if not any(tag in chat_tags for tag in filter_tags):
                             continue
-                
-                with open(chat_file_path, "r", encoding="utf-8") as f:
-                    chat_data = json.load(f)
-                
-                # Apply search filters
-                if filter_pinned and not chat_data.get("args", {}).get("is_pinned", False):
-                    continue
                     
-                if filter_favorites and not chat_data.get("args", {}).get("is_favorite", False):
-                    continue
+                    # Apply text search
+                    if query:
+                        title = chat_data.get("args", {}).get("title", "")
+                        # Simple text search in title
+                        if query.lower() not in title.lower():
+                            # Search in chat content (as a fallback)
+                            chat_content = json.dumps(chat_data.get("chat", {}))
+                            if query.lower() not in chat_content.lower():
+                                continue
                     
-                if filter_tags:
-                    chat_tags = chat_data.get("args", {}).get("tags", [])
-                    if not any(tag in chat_tags for tag in filter_tags):
-                        continue
-                
-                # Apply text search
-                if query:
+                    # Extract metadata for results
+                    print(chat_data)
+                    
+                    print(chat_data.get("args", {}).get("is_favorite", False))
+                    
+                    chat_uuid = chat_data.get("args", {}).get("uuid", "")
                     title = chat_data.get("args", {}).get("title", "")
-                    # Simple text search in title
-                    if query.lower() not in title.lower():
-                        # Search in chat content (as a fallback)
-                        chat_content = json.dumps(chat_data.get("chat", {}))
-                        if query.lower() not in chat_content.lower():
-                            continue
-                
-                # Extract metadata for results
-                chat_uuid = chat_data.get("args", {}).get("uuid", "")
-                title = chat_data.get("args", {}).get("title", "")
-                created_at = chat_data.get("args", {}).get("created_at", "")
-                is_pinned = chat_data.get("args", {}).get("is_pinned", False)
-                is_favorite = chat_data.get("args", {}).get("is_favorite", False)
-                tags = chat_data.get("args", {}).get("tags", [])
-                
-                result.append({
-                    "uuid": chat_uuid,
-                    "title": title,
-                    "created_at": created_at,
-                    "is_pinned": is_pinned,
-                    "is_favorite": is_favorite,
-                    "tags": tags
-                })
-            except Exception as e:
-                logger.warning(f"Error reading chat file {chat_file_path}: {e}")
-                continue
+                    created_at = chat_data.get("args", {}).get("created_at", "")
+                    updated_at = chat_data.get("args", {}).get("updated_at", "")
+                    is_favorite = chat_data.get("args", {}).get("is_favorite", False)
+                    tags = chat_data.get("args", {}).get("tags", [])
+                    
+                    result.append({
+                        "uuid": chat_uuid,
+                        "title": title,
+                        "created_at": created_at,
+                        "updated_at": updated_at,
+                        "is_favorite": is_favorite,
+                        "tags": tags,
+                        "location": "global"
+                    })
+                except Exception as e:
+                    logger.warning(f"Error reading global chat file {chat_file_path}: {e}")
+                    continue
         
-        # Sort results by created_at (newest first)
-        result.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        # Search in folders
+        if search_folders:
+            # Determine which folders to search
+            if folder_id is not None and folder_id != "global":
+                folder_dirs = [folder_id] if os.path.isdir(os.path.join(CHAT_FOLDERS_DIR, folder_id)) else []
+            else:
+                folder_dirs = [d for d in os.listdir(CHAT_FOLDERS_DIR) 
+                             if os.path.isdir(os.path.join(CHAT_FOLDERS_DIR, d))]
+            
+            for folder_name in folder_dirs:
+                folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+                
+                # Get folder info
+                folder_info = {"name": folder_name, "folder_id": folder_name}
+                index_path = os.path.join(folder_path, "index.json")
+                if os.path.exists(index_path):
+                    try:
+                        with open(index_path, "r", encoding="utf-8") as f:
+                            folder_info = json.load(f)
+                    except Exception as e:
+                        logger.warning(f"Error reading folder metadata: {e}")
+                
+                # Search chats in this folder
+                chat_dirs = [d for d in os.listdir(folder_path) 
+                           if os.path.isdir(os.path.join(folder_path, d)) and d != "index.json"]
+                
+                for chat_uuid in chat_dirs:
+                    chat_file_path = os.path.join(folder_path, chat_uuid, "chat.json")
+                    
+                    if not os.path.exists(chat_file_path):
+                        continue
+                        
+                    try:
+                        with open(chat_file_path, "r", encoding="utf-8") as f:
+                            chat_data = json.load(f)
+                        
+                        # Apply filters
+                        if filter_favorites and not chat_data.get("args", {}).get("is_favorite", False):
+                            continue
+                            
+                        if filter_tags:
+                            chat_tags = chat_data.get("args", {}).get("tags", [])
+                            if not any(tag in chat_tags for tag in filter_tags):
+                                continue
+                        
+                        # Apply text search
+                        if query:
+                            title = chat_data.get("args", {}).get("title", "")
+                            # Simple text search in title
+                            if query.lower() not in title.lower():
+                                # Search in chat content (as a fallback)
+                                chat_content = json.dumps(chat_data.get("chat", {}))
+                                if query.lower() not in chat_content.lower():
+                                    continue
+                        
+                        # Extract metadata for results
+                        chat_uuid = chat_data.get("args", {}).get("uuid", "")
+                        title = chat_data.get("args", {}).get("title", "")
+                        created_at = chat_data.get("args", {}).get("created_at", "")
+                        updated_at = chat_data.get("args", {}).get("updated_at", "")
+                        is_favorite = chat_data.get("args", {}).get("is_favorite", False)
+                        tags = chat_data.get("args", {}).get("tags", [])
+                        
+                        result.append({
+                            "uuid": chat_uuid,
+                            "title": title,
+                            "created_at": created_at,
+                            "updated_at": updated_at,
+                            "is_favorite": is_favorite,
+                            "tags": tags,
+                            "location": "folder",
+                            "folder_id": folder_name,
+                            "folder_name": folder_info.get("name", folder_name)
+                        })
+                    except Exception as e:
+                        logger.warning(f"Error reading folder chat file {chat_file_path}: {e}")
+                        continue
+        
+        # Sort results by created_at or updated_at (newest first)
+        result.sort(key=lambda x: x.get("updated_at", x.get("created_at", "")), reverse=True)
         
         return {"results": result}
     except Exception as e:
@@ -756,14 +1226,33 @@ async def bulk_delete_chats(request: BulkChatOperation):
         
         for chat_uuid in request.chat_uuids:
             try:
-                folder_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid)
+                # Find the chat location (global or in a folder)
+                path_to_delete = None
                 
-                if not os.path.exists(folder_path):
-                    results["failed"].append({"uuid": chat_uuid, "reason": "Not found"})
+                # Check global first
+                global_chat_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid)
+                if os.path.exists(global_chat_path):
+                    path_to_delete = global_chat_path
+                else:
+                    # Search in folders
+                    for folder_name in os.listdir(CHAT_FOLDERS_DIR):
+                        folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+                        
+                        if not os.path.isdir(folder_path):
+                            continue
+                            
+                        potential_path = os.path.join(folder_path, chat_uuid)
+                        
+                        if os.path.exists(potential_path):
+                            path_to_delete = potential_path
+                            break
+                
+                if not path_to_delete:
+                    results["failed"].append({"uuid": chat_uuid, "reason": "Chat not found"})
                     continue
                 
-                # Delete the folder and its contents
-                shutil.rmtree(folder_path)
+                # Delete the chat folder
+                shutil.rmtree(path_to_delete)
                 results["successful"].append(chat_uuid)
             except Exception as e:
                 results["failed"].append({"uuid": chat_uuid, "reason": str(e)})
@@ -774,32 +1263,32 @@ async def bulk_delete_chats(request: BulkChatOperation):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.put("/api/chat/bulk-folder-assign")
-async def bulk_assign_to_folder(folder_id: str, request: BulkChatOperation):
+@app.put("/api/chat/bulk-move")
+async def bulk_move_chats(destination: str, request: BulkChatOperation):
     """
-    Assign multiple chats to a folder at once.
+    Move multiple chats to a folder or to global at once.
     
     Args:
-        folder_id: The folder ID to assign chats to
-        request: The BulkChatOperation containing chat UUIDs to assign
+        destination: The destination ('global' or folder ID)
+        request: The BulkChatOperation containing chat UUIDs to move
         
     Returns:
-        dict: A dictionary with the status of the bulk assign operation
+        dict: A dictionary with the status of the bulk move operation
     """
     try:
-        # Verify the folder exists
-        folder_metadata_path = os.path.join(CHAT_FOLDERS_DIR, "folders.json")
-        
-        if not os.path.exists(folder_metadata_path):
-            raise HTTPException(status_code=404, detail="No folders exist")
-        
-        with open(folder_metadata_path, "r", encoding="utf-8") as f:
-            folders = json.load(f)
-        
-        # Check if the folder exists
-        folder_exists = any(folder["folder_id"] == folder_id for folder in folders)
-        if not folder_exists:
-            raise HTTPException(status_code=404, detail=f"Folder with ID {folder_id} not found")
+        # If destination is not global, verify the folder exists
+        if destination != "global":
+            folder_path = os.path.join(CHAT_FOLDERS_DIR, destination)
+            if not os.path.exists(folder_path):
+                # Create the folder if it doesn't exist with a default index.json
+                os.makedirs(folder_path, exist_ok=True)
+                index_data = {
+                    "folder_id": destination,
+                    "name": f"Folder {destination[:8]}",
+                    "created_at": datetime.now().isoformat()
+                }
+                with open(os.path.join(folder_path, "index.json"), "w", encoding="utf-8") as f:
+                    json.dump(index_data, f, ensure_ascii=False, indent=2)
         
         results = {
             "successful": [],
@@ -808,27 +1297,141 @@ async def bulk_assign_to_folder(folder_id: str, request: BulkChatOperation):
         
         for chat_uuid in request.chat_uuids:
             try:
-                chat_folder_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid)
+                # Find the chat location (global or in a folder)
+                source_path = None
+                source_location = None
+                source_folder_id = None
                 
-                if not os.path.exists(chat_folder_path):
+                # Check global first
+                global_chat_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid)
+                if os.path.exists(global_chat_path):
+                    source_path = global_chat_path
+                    source_location = "global"
+                else:
+                    # Search in folders
+                    for folder_name in os.listdir(CHAT_FOLDERS_DIR):
+                        folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+                        
+                        if not os.path.isdir(folder_path):
+                            continue
+                            
+                        potential_path = os.path.join(folder_path, chat_uuid)
+                        
+                        if os.path.exists(potential_path):
+                            source_path = potential_path
+                            source_location = "folder"
+                            source_folder_id = folder_name
+                            break
+                
+                if not source_path:
                     results["failed"].append({"uuid": chat_uuid, "reason": "Chat not found"})
                     continue
                 
-                # Update the chat's folder assignment
-                folder_assignment_path = os.path.join(chat_folder_path, "folder.json")
+                # Determine destination path
+                if destination == "global":
+                    destination_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid)
+                else:
+                    destination_path = os.path.join(CHAT_FOLDERS_DIR, destination, chat_uuid)
                 
-                with open(folder_assignment_path, "w", encoding="utf-8") as f:
-                    json.dump({"folder_id": folder_id}, f, ensure_ascii=False, indent=2)
+                # Move the chat if it's not already at the destination
+                if os.path.normpath(source_path) != os.path.normpath(destination_path):
+                    # Make sure destination doesn't already exist
+                    if os.path.exists(destination_path):
+                        shutil.rmtree(destination_path)
+                    
+                    # Copy the chat folder to the destination
+                    shutil.copytree(source_path, destination_path)
+                    
+                    # Remove the source folder
+                    shutil.rmtree(source_path)
+                    
+                    results["successful"].append({
+                        "uuid": chat_uuid,
+                        "from": {"location": source_location, "folder_id": source_folder_id},
+                        "to": {"location": "global" if destination == "global" else "folder", 
+                              "folder_id": None if destination == "global" else destination}
+                    })
+                else:
+                    # Chat is already at the destination
+                    results["successful"].append({
+                        "uuid": chat_uuid,
+                        "from": {"location": source_location, "folder_id": source_folder_id},
+                        "to": {"location": source_location, "folder_id": source_folder_id},
+                        "note": "Already at destination"
+                    })
+            except Exception as e:
+                results["failed"].append({"uuid": chat_uuid, "reason": str(e)})
+        
+        return results
+    except Exception as e:
+        logger.error(f"Error in bulk move operation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/chat/bulk-favorite")
+async def bulk_favorite_chats(favorite_status: bool, request: BulkChatOperation):
+    """
+    Mark multiple chats as favorite or unfavorite at once.
+    
+    Args:
+        favorite_status: Whether to favorite (True) or unfavorite (False) the chats
+        request: The BulkChatOperation containing chat UUIDs to update
+        
+    Returns:
+        dict: A dictionary with the status of the bulk favorite operation
+    """
+    try:
+        results = {
+            "successful": [],
+            "failed": []
+        }
+        
+        for chat_uuid in request.chat_uuids:
+            try:
+                # Find the chat location (global or in a folder)
+                chat_file_path = None
+                
+                # Check global first
+                global_chat_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid, "chat.json")
+                if os.path.exists(global_chat_path):
+                    chat_file_path = global_chat_path
+                else:
+                    # Search in folders
+                    for folder_name in os.listdir(CHAT_FOLDERS_DIR):
+                        folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+                        
+                        if not os.path.isdir(folder_path):
+                            continue
+                            
+                        potential_path = os.path.join(folder_path, chat_uuid, "chat.json")
+                        
+                        if os.path.exists(potential_path):
+                            chat_file_path = potential_path
+                            break
+                
+                if not chat_file_path:
+                    results["failed"].append({"uuid": chat_uuid, "reason": "Chat not found"})
+                    continue
+                
+                # Read existing data
+                with open(chat_file_path, "r", encoding="utf-8") as f:
+                    existing_data = json.load(f)
+                
+                # Update favorite status
+                existing_data["args"]["is_favorite"] = favorite_status
+                existing_data["args"]["updated_at"] = datetime.now().isoformat()
+                
+                # Save updated data back to file
+                with open(chat_file_path, "w", encoding="utf-8") as f:
+                    json.dump(existing_data, f, ensure_ascii=False, indent=2)
                 
                 results["successful"].append(chat_uuid)
             except Exception as e:
                 results["failed"].append({"uuid": chat_uuid, "reason": str(e)})
         
         return results
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error in bulk folder assignment: {e}")
+        logger.error(f"Error in bulk favorite operation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -852,9 +1455,28 @@ async def bulk_tag_chats(tags: List[str], request: BulkChatOperation):
         
         for chat_uuid in request.chat_uuids:
             try:
-                chat_file_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid, "chat.json")
+                # Find the chat location (global or in a folder)
+                chat_file_path = None
                 
-                if not os.path.exists(chat_file_path):
+                # Check global first
+                global_chat_path = os.path.join(CHAT_GLOBAL_DIR, chat_uuid, "chat.json")
+                if os.path.exists(global_chat_path):
+                    chat_file_path = global_chat_path
+                else:
+                    # Search in folders
+                    for folder_name in os.listdir(CHAT_FOLDERS_DIR):
+                        folder_path = os.path.join(CHAT_FOLDERS_DIR, folder_name)
+                        
+                        if not os.path.isdir(folder_path):
+                            continue
+                            
+                        potential_path = os.path.join(folder_path, chat_uuid, "chat.json")
+                        
+                        if os.path.exists(potential_path):
+                            chat_file_path = potential_path
+                            break
+                
+                if not chat_file_path:
                     results["failed"].append({"uuid": chat_uuid, "reason": "Chat not found"})
                     continue
                 
@@ -880,107 +1502,6 @@ async def bulk_tag_chats(tags: List[str], request: BulkChatOperation):
         return results
     except Exception as e:
         logger.error(f"Error in bulk tag operation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/chat/export/{chat_uuid}")
-async def export_chat(chat_uuid: str, format: str = "json"):
-    """
-    Export a chat in a specified format.
-    
-    Args:
-        chat_uuid: The UUID of the chat to export
-        format: The format to export in (json, markdown, etc.)
-        
-    Returns:
-        The exported chat file
-    """
-    try:
-        file_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid, "chat.json")
-        
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
-        
-        with open(file_path, "r", encoding="utf-8") as f:
-            chat_data = json.load(f)
-        
-        if format.lower() == "json":
-            # Return the raw JSON
-            return chat_data
-        elif format.lower() == "markdown":
-            # Convert to markdown format
-            title = chat_data.get("args", {}).get("title", "Untitled Chat")
-            created_at = chat_data.get("args", {}).get("created_at", "")
-            
-            markdown_content = f"# {title}\n\n"
-            markdown_content += f"*Created: {created_at}*\n\n"
-            
-            # Format chat messages
-            for message in chat_data.get("chat", []):
-                role = message.get("role", "")
-                content = message.get("content", "")
-                
-                if isinstance(content, list):
-                    # Handle content items
-                    text_content = ""
-                    for item in content:
-                        if item.get("type") == "text":
-                            text_content += item.get("text", "")
-                    content = text_content
-                
-                markdown_content += f"## {role.capitalize()}\n\n{content}\n\n---\n\n"
-            
-            return JSONResponse(
-                content={"markdown": markdown_content},
-                media_type="application/json"
-            )
-        else:
-            raise HTTPException(status_code=400, detail=f"Unsupported export format: {format}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error exporting chat: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/chat/continue/{chat_uuid}")
-async def continue_chat(chat_uuid: str):
-    """
-    Continue a conversation from a saved chat history.
-    
-    Args:
-        chat_uuid: The UUID of the chat to continue
-        
-    Returns:
-        The chat data that can be loaded into the chat UI
-    """
-    try:
-        file_path = os.path.join(CHAT_FOLDERS_DIR, chat_uuid, "chat.json")
-        
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail=f"Chat with UUID {chat_uuid} not found")
-        
-        with open(file_path, "r", encoding="utf-8") as f:
-            chat_data = json.load(f)
-        
-        # Extract the chat messages in a format suitable for the UI
-        # Update the timestamp to show it was continued
-        chat_data["args"]["continued_at"] = datetime.now().isoformat()
-        
-        # Save the updated chat with continuation timestamp
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(chat_data, f, ensure_ascii=False, indent=2)
-        
-        return {
-            "uuid": chat_uuid,
-            "title": chat_data.get("args", {}).get("title", ""),
-            "chat": chat_data.get("chat", []),
-            "status": "continued"
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error continuing chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
