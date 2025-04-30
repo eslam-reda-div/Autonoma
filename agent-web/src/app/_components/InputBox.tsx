@@ -34,6 +34,8 @@ export function InputBox({
   responding,
   onSend,
   onCancel,
+  initialText = "",
+  initialImages = [],
 }: {
   className?: string;
   size?: "large" | "normal";
@@ -43,17 +45,21 @@ export function InputBox({
     options: { deepThinkingMode: boolean; searchBeforePlanning: boolean; images?: string[] },
   ) => void;
   onCancel?: () => void;
+  initialText?: string;
+  initialImages?: string[];
 }) {
   const teamMembers = useStore((state) => state.teamMembers);
   const enabledTeamMembers = useStore((state) => state.enabledTeamMembers);
 
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialText);
   const [deepThinkingMode, setDeepThinkMode] = useState(false);
   const [searchBeforePlanning, setSearchBeforePlanning] = useState(false);
   const [imeStatus, setImeStatus] = useState<"active" | "inactive">("inactive");
   const [isRecording, setIsRecording] = useState(false);
   const [speechLanguage, setSpeechLanguage] = useState<"en-US" | "ar-SA">("en-US");
-  const [images, setImages] = useState<{ base64: string; file: File }[]>([]);
+  const [images, setImages] = useState<{ base64: string; file?: File }[]>(
+    initialImages.map(image => ({ base64: image }))
+  );
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -371,6 +377,7 @@ export function InputBox({
               <p>Enable or disable agents</p>
             </TooltipContent>
           </Tooltip>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

@@ -3,9 +3,12 @@ import Markdown from "react-markdown";
 
 import { type Message } from "~/core/messaging";
 import { cn } from "~/core/utils";
+import { useStore, updateMessage, sendMessage } from "~/core/store";
 
 import { LoadingAnimation } from "./LoadingAnimation";
 import { WorkflowProgressView } from "./WorkflowProgressView";
+import { InputBox } from "./InputBox";
+import { EditOutlined } from "@ant-design/icons";
 
 export function MessageHistoryView({
   className,
@@ -16,18 +19,89 @@ export function MessageHistoryView({
   messages: Message[];
   loading?: boolean;
 }) {
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+
   return (
     <div className={cn(className)}>
-      {messages.map((message) => (
-        <MessageView key={message.id} message={message} />
+      {messages.map((message, index) => (
+        <MessageView 
+          key={message.id} 
+          message={message} 
+          isEditing={message.id === editingMessageId}
+          onStartEditing={() => setEditingMessageId(message.id)}
+          onCancelEditing={() => setEditingMessageId(null)}
+          onSaveEdit={(text, options) => {
+            // Find current message index
+            const currentIndex = messages.findIndex(m => m.id === message.id);
+            if (currentIndex === -1) return;
+            
+            // Get all messages from the store
+            const storeMessages = useStore.getState().messages;
+            
+            // Remove all messages after the current one (including the current one)
+            const messagesToKeep = storeMessages.slice(0, currentIndex);
+            
+            console.log("Messages to keep:", messagesToKeep);
+
+            // Create the updated message
+            let updatedMessage: Message;
+            
+            if (options.images && options.images.length > 0) {
+              updatedMessage = {
+                id: message.id,
+                role: "user",
+                type: "imagetext",
+                content: {
+                  text: text,
+                  images: options.images
+                }
+              };
+            } else {
+              updatedMessage = {
+                id: message.id,
+                role: "user",
+                type: "text",
+                content: text
+              };
+            }
+            
+            // Update the store with the kept messages + new updated message
+            useStore.setState({ messages: [...messagesToKeep] });
+            
+            // Send the updated message to get a new response
+            void sendMessage(updatedMessage, {
+              deepThinkingMode: options.deepThinkingMode,
+              searchBeforePlanning: options.searchBeforePlanning
+            });
+            
+            // Exit edit mode
+            setEditingMessageId(null);
+          }}
+          nextMessages={messages.slice(index + 1)}
+        />
       ))}
       {loading && <LoadingAnimation className="mt-8" />}
     </div>
   );
 }
 
-function MessageView({ message }: { message: Message }) {
+function MessageView({ 
+  message, 
+  isEditing,
+  onStartEditing,
+  onCancelEditing,
+  onSaveEdit,
+  nextMessages
+}: { 
+  message: Message;
+  isEditing: boolean;
+  onStartEditing: () => void;
+  onCancelEditing: () => void;
+  onSaveEdit: (text: string, options: { deepThinkingMode: boolean; searchBeforePlanning: boolean; images?: string[] }) => void;
+  nextMessages: Message[];
+}) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isHovering, setIsHovering] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
 
   // Close popup when clicking outside the image
@@ -57,9 +131,55 @@ function MessageView({ message }: { message: Message }) {
     document.body.removeChild(link);
   };
 
+  if (isEditing) {
+    // Determine initial content and images for InputBox
+    let initialText = "";
+    let initialImages: string[] = [];
+    
+    if (message.type === "text") {
+      initialText = message.content as string;
+    } else if (message.type === "imagetext") {
+      initialText = message.content.text;
+      initialImages = message.content.images || [];
+    }
+    
+    return (
+      <div className="w-full mb-8 bg-white rounded-2xl shadow-xs border border-gray-100">
+        <div className="p-2 bg-gray-50 rounded-t-lg border border-gray-100 flex items-center">
+          <span className="text-sm font-medium text-gray-700">Edit message</span>
+          <button 
+            onClick={onCancelEditing}
+            className="ml-auto px-3 py-1 text-sm text-gray-600 hover:text-gray-800 bg-white rounded-md border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+        <InputBox 
+          className="w-full rounded-t-none border border-gray-100 border-t-0"
+          responding={false}
+          initialText={initialText}
+          initialImages={initialImages}
+          onCancel={onCancelEditing}
+          onSend={(text, options) => {
+            onSaveEdit(text, options);
+          }}
+        />
+        {nextMessages.length > 0 && (
+          <div className="text-xs text-gray-500 mt-2 text-center mb-2">
+            Editing this message will remove {nextMessages.length} subsequent message{nextMessages.length !== 1 ? 's' : ''}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (message.type === "text" && message.content) {
     return (
-      <div className={cn("flex", message.role === "user" && "justify-end")}>
+      <div 
+        className={cn("flex", message.role === "user" && "justify-end")}
+        onMouseEnter={() => message.role === "user" && setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
         <div
           className={cn(
             "relative mb-8 w-fit max-w-[95%] sm:max-w-[90%] md:max-w-[75%] lg:max-w-[560px] rounded-2xl px-4 py-3 shadow-xs",
@@ -67,6 +187,15 @@ function MessageView({ message }: { message: Message }) {
             message.role === "assistant" && "rounded-es-none bg-white",
           )}
         >
+          {message.role === "user" && isHovering && (
+            <button 
+              className="absolute -left-10 top-2 text-gray-500 hover:text-gray-700 transition-colors"
+              onClick={onStartEditing}
+              aria-label="Edit message"
+            >
+              <EditOutlined className="h-4 w-4" />
+            </button>
+          )}
           <Markdown
             components={{
               a: ({ href, children }) => (
@@ -84,7 +213,11 @@ function MessageView({ message }: { message: Message }) {
   } else if (message.type === "imagetext" && message.content) {
     return (
       <>
-        <div className={cn("flex", message.role === "user" && "justify-end")}>
+        <div 
+          className={cn("flex", message.role === "user" && "justify-end")}
+          onMouseEnter={() => message.role === "user" && setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+        >
           <div
             className={cn(
               "relative mb-8 w-fit max-w-[95%] sm:max-w-[90%] md:max-w-[75%] lg:max-w-[560px] rounded-2xl px-4 py-3 shadow-xs",
@@ -92,6 +225,15 @@ function MessageView({ message }: { message: Message }) {
               message.role === "assistant" && "rounded-es-none bg-white",
             )}
           >
+            {message.role === "user" && isHovering && (
+              <button 
+                className="absolute -left-10 top-2 text-gray-500 hover:text-gray-700 transition-colors"
+                onClick={onStartEditing}
+                aria-label="Edit message"
+              >
+                <EditOutlined className="h-4 w-4" />
+              </button>
+            )}
             {message.content.images && message.content.images.length > 0 && (
               <div className="flex flex-wrap flex-col gap-2 mb-3">
                 {message.content.images.map((image, index) => (
