@@ -1095,11 +1095,7 @@ async def search_chats(query: str = "", folder_id: Optional[str] = None, filter_
                             if query.lower() not in chat_content.lower():
                                 continue
                     
-                    # Extract metadata for results
-                    print(chat_data)
-                    
-                    print(chat_data.get("args", {}).get("is_favorite", False))
-                    
+                    # Extract metadata for results                    
                     chat_uuid = chat_data.get("args", {}).get("uuid", "")
                     title = chat_data.get("args", {}).get("title", "")
                     created_at = chat_data.get("args", {}).get("created_at", "")
