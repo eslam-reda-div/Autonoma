@@ -4,6 +4,13 @@ import {
   SearchOutlined,
   UnorderedListOutlined,
   LaptopOutlined,
+  FileOutlined,
+  CopyOutlined,
+  DeleteOutlined,
+  FolderOutlined,
+  EditOutlined,
+  SwapOutlined,
+  FileSearchOutlined,
 } from "@ant-design/icons";
 import { LRUCache } from "lru-cache";
 import { useMemo } from "react";
@@ -25,6 +32,20 @@ export function ToolCallView({ task }: { task: ToolCallTask }) {
     return <BashToolCallView task={task as ToolCallTask<any>} />;
   } else if (task.payload.toolName === "computer") {
     return <ComputerToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "copy_file") {
+    return <CopyFileToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "file_delete") {
+    return <DeleteFileToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "move_file") {
+    return <MoveFileToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "file_search") {
+    return <FileSearchToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "list_directory") {
+    return <ListDirectoryToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "read_file") {
+    return <ReadFileToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "write_file") {
+    return <WriteFileToolCallView task={task as ToolCallTask<any>} />;
   }
   return <div>{task.payload.toolName}</div>;
 }
@@ -256,6 +277,471 @@ function BashToolCallView({ task }: { task: ToolCallTask<{ cmd: string }> }) {
           </SyntaxHighlighter>
         </div>
       )}
+    </div>
+  );
+}
+
+function CopyFileToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ source_path: string; destination_path: string }>;
+}) {
+  const isPending = task.state === "pending";
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <CopyOutlined className="h-4 w-4 text-sm text-blue-500" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Copy File</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* File paths section */}
+        <div className="flex flex-col space-y-3 mb-2">
+          <div className="flex items-center">
+            <div className="text-xs text-gray-500 w-24">Source:</div>
+            <div className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 flex-1 truncate">
+              {task.payload.input.source_path}
+            </div>
+          </div>
+          {/* Arrow animation for move operation */}
+          <div className={`flex justify-center ${isPending ? 'animate-pulse' : ''}`}>
+            <div className="bg-purple-100 rounded-full p-1">
+              <SwapOutlined className="text-purple-500 rotate-90" />
+            </div>
+          </div>
+          <div className="flex items-center relative">
+            {/* <div className="absolute left-12 top-0 bottom-0 w-0.5 bg-blue-200"></div>
+            <div className="absolute left-12 top-1/2 w-3 h-0.5 bg-blue-200"></div> */}
+            <div className="text-xs text-gray-500 w-24">Destination:</div>
+            <div className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 flex-1 truncate">
+              {task.payload.input.destination_path}
+            </div>
+          </div>
+        </div>
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Copying...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Copy complete
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteFileToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ file_path: string }>;
+}) {
+  const isPending = task.state === "pending";
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <DeleteOutlined className="h-4 w-4 text-sm text-red-500" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Delete File</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* File path section */}
+        <div className="flex items-center">
+          <div className="text-xs text-gray-500 w-24">Path:</div>
+          <div className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 flex-1 truncate">
+            {task.payload.input.file_path}
+          </div>
+        </div>
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Deleting...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              File deleted
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MoveFileToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ source_path: string; destination_path: string }>;
+}) {
+  const isPending = task.state === "pending";
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <SwapOutlined className="h-4 w-4 text-sm text-purple-500" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Move File</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* File paths section */}
+        <div className="flex flex-col space-y-3 mb-2">
+          <div className="flex items-center">
+            <div className="text-xs text-gray-500 w-24">From:</div>
+            <div className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 flex-1 truncate">
+              {task.payload.input.source_path}
+            </div>
+          </div>
+          {/* Arrow animation for move operation */}
+          <div className={`flex justify-center ${isPending ? 'animate-pulse' : ''}`}>
+            <div className="bg-purple-100 rounded-full p-1">
+              <SwapOutlined className="text-purple-500 rotate-90" />
+            </div>
+          </div>
+          
+          <div className="flex items-center">
+            <div className="text-xs text-gray-500 w-24">To:</div>
+            <div className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 flex-1 truncate">
+              {task.payload.input.destination_path}
+            </div>
+          </div>
+        </div>
+        
+        
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Moving...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Move complete
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FileSearchToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ dir_path: string; pattern: string }>;
+}) {
+  const isPending = task.state === "pending";
+  const results = useMemo(() => {
+    try {
+      return task.payload.output ? JSON.parse(task.payload.output) : [];
+    } catch {
+      return [];
+    }
+  }, [task.payload.output]);
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <FileSearchOutlined className="h-4 w-4 text-sm text-indigo-500" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">File Search</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* Search parameters */}
+        <div className="flex flex-col space-y-3 mb-4">
+          <div className="flex items-center">
+            <div className="text-xs text-gray-500 w-24">Directory:</div>
+            <div className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 flex-1 truncate">
+              {task.payload.input.dir_path}
+            </div>
+          </div>
+          
+          <div className="flex items-center">
+            <div className="text-xs text-gray-500 w-24">Pattern:</div>
+            <div className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 flex-1">
+              {task.payload.input.pattern}
+            </div>
+          </div>
+        </div>
+        
+        {/* Results section */}
+        {!isPending && results.length > 0 && (
+          <div className="mt-4">
+            <div className="text-xs text-gray-500 mb-2 flex items-center">
+              <SearchOutlined className="mr-1" /> {results.length} files found
+            </div>
+            <div className="max-h-[200px] overflow-y-auto bg-white rounded border border-gray-200 p-2">
+              <ul className="text-xs">
+                {results.map((file: string, index: number) => (
+                  <li 
+                    key={index}
+                    className="py-1 font-mono truncate animate-bg-blink"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <FileOutlined className="mr-2 text-indigo-400" />
+                    {file}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Searching files...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Search complete
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ListDirectoryToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ dir_path: string }>;
+}) {
+  const isPending = task.state === "pending";
+  const files = useMemo(() => {
+    try {
+      return task.payload.output ? JSON.parse(task.payload.output) : [];
+    } catch {
+      return [];
+    }
+  }, [task.payload.output]);
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <FolderOutlined className="h-4 w-4 text-sm text-amber-500" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">List Directory</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* Directory path */}
+        <div className="flex items-center mb-4">
+          <div className="text-xs text-gray-500 w-24">Path:</div>
+          <div className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 flex-1 truncate">
+            {task.payload.input.dir_path}
+          </div>
+        </div>
+        
+        {/* Contents section */}
+        {!isPending && files.length > 0 && (
+          <div className="mt-4">
+            <div className="text-xs text-gray-500 mb-2 flex items-center">
+              <FolderOutlined className="mr-1" /> {files.length} items found
+            </div>
+            <div className="max-h-[200px] overflow-y-auto bg-white rounded border border-gray-200 p-2">
+              <ul className="text-xs grid grid-cols-1 md:grid-cols-2 gap-1">
+                {files.map((file: string, index: number) => {
+                  const isDirectory = file.endsWith('/');
+                  return (
+                    <li 
+                      key={index}
+                      className="py-1 px-2 font-mono truncate animate-bg-blink hover:bg-gray-50 rounded"
+                      style={{ animationDelay: `${index * 30}ms` }}
+                    >
+                      {isDirectory ? (
+                        <FolderOutlined className="mr-2 text-amber-500" />
+                      ) : (
+                        <FileOutlined className="mr-2 text-gray-500" />
+                      )}
+                      {file}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Reading directory...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Directory listed
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReadFileToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ file_path: string }>;
+}) {
+  const isPending = task.state === "pending";
+  const fileContent = task.payload.output || "";
+
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <FileOutlined className="h-4 w-4 text-sm text-teal-500" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Read File</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* File path section */}
+        <div className="flex items-center mb-3">
+          <div className="text-xs text-gray-500 w-24">Path:</div>
+          <div className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 flex-1 truncate">
+            {task.payload.input.file_path}
+          </div>
+        </div>
+        
+        {/* File content section */}
+        {!isPending && fileContent && (
+          <div className="mt-4">
+            <div className="text-xs text-gray-500 mb-2 flex items-center">
+              <FileOutlined className="mr-1" /> File Content
+            </div>
+            <div className="max-h-[300px] overflow-y-auto bg-white rounded border border-gray-200 p-2">
+              <pre className="text-xs font-mono whitespace-pre-wrap break-words">{fileContent}</pre>
+            </div>
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Reading file...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              File read complete
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WriteFileToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ file_path: string; text: string }>;
+}) {
+  const isPending = task.state === "pending";
+  const fileName = useMemo(() => {
+    const parts = task.payload.input.file_path.split('/');
+    return parts[parts.length - 1];
+  }, [task.payload.input.file_path]);
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <EditOutlined className="h-4 w-4 text-sm text-emerald-500" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Write File</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* File path section */}
+        <div className="flex items-center mb-3">
+          <div className="text-xs text-gray-500 w-24">Path:</div>
+          <div className="text-sm font-mono bg-white px-2 py-1 rounded border border-gray-200 flex-1 truncate">
+            {task.payload.input.file_path}
+          </div>
+        </div>
+        
+        {/* Content preview */}
+        <div className="mt-1">
+          <div className="text-xs text-gray-500 mb-2 flex items-center">
+            <EditOutlined className="mr-1" /> Content Preview
+          </div>
+          <div className="max-h-[200px] overflow-y-auto bg-white rounded border border-gray-200 p-2">
+            <pre className="text-xs font-mono whitespace-pre-wrap break-words line-clamp-10">
+              {task.payload.input.text}
+            </pre>
+          </div>
+        </div>
+        
+        {/* Status indicator with file info */}
+        <div className="flex justify-between items-center mt-3">
+          <div className="text-xs text-gray-500">
+            <FileOutlined className="mr-1" /> {fileName}
+          </div>
+          
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Writing file...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              File written
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

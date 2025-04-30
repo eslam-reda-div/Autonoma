@@ -93,10 +93,6 @@ export function ChatHistorySidebar() {
     }
   }, [loadChatHistory, loadFolders]);
 
-  useEffect(() => {
-    console.log(chats);
-}, [chats]);
-
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -673,7 +669,6 @@ function ChatHistoryListItem({ chat, isActive }: { chat: ChatHistoryItem; isActi
   
   // Format date to be more readable
   const formatDate = (dateString: string) => {
-    console.log(dateString);
     const date = new Date(dateString);
     const now = new Date();
     const yesterday = new Date(now);

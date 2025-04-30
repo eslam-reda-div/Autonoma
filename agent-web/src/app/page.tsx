@@ -89,7 +89,6 @@ export default function HomePage() {
         
         // If we have a current chat UUID, update it, otherwise create a new one
         if (currentChatUuid) {
-          console.log(chatData);
           
           await fetch(getApiUrl() + `/chat/history/${currentChatUuid}`, {
             method: 'PUT',
@@ -99,7 +98,6 @@ export default function HomePage() {
             body: JSON.stringify(chatData)
           });
         } else {
-          console.log(chatData);
           const response = await fetch(getApiUrl() + `/chat/save`, {
             method: 'POST',
             headers: {

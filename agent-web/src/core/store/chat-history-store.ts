@@ -94,10 +94,8 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
           if (!response.ok) {
             throw new Error(`Failed to load chat history: ${response.statusText}`);
           }
-
           
           const data = await response.json();
-          console.log("Chat history response:", data);
           set({ 
             chats: searchQuery || filterFavorites || filterFolderUuid ? data.results : data.history, 
             isLoading: false 
