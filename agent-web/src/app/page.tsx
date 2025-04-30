@@ -75,11 +75,11 @@ export default function HomePage() {
         // Prepare chat data to save
         const firstUserMessage = messages.find(m => m.role === "user");
         const title = firstUserMessage 
-          ? firstUserMessage.content.toString().substring(0, 50) 
+          ? firstUserMessage.content.toString().substring(0, 20) 
           : "New Chat";
           
         const chatData = {
-          title: title + (title.length >= 50 ? "..." : ""),
+          title: title + (title.length >= 20 ? "..." : ""),
           messages: messages,
           args: {
             is_favorite: false,

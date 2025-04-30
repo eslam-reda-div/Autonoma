@@ -412,7 +412,7 @@ export function ChatHistorySidebar() {
                   )}
 
                   {/* Folders */}
-                  {!isLoading && folders && folders.length > 0 && !filterFolderUuid && !filterFavorites && (
+                  {!isLoading && !searchQuery && folders && folders.length > 0 && !filterFolderUuid && !filterFavorites && (
                     <div className="mb-3">
                       <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1 px-2">
                         Folders
@@ -431,7 +431,7 @@ export function ChatHistorySidebar() {
                   )}
 
                   {/* Global Chats */}
-                  {!isLoading && globalChats && globalChats.length > 0 && !filterFolderUuid && !filterFavorites && (
+                  {!isLoading && !searchQuery && globalChats && globalChats.length > 0 && !filterFolderUuid && !filterFavorites && (
                     <div>
                       <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1 px-2">
                         Global Chats
