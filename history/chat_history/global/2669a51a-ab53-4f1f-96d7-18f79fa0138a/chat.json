@@ -1,0 +1,110 @@
+{
+  "args": {
+    "title": "open laravel.com web...",
+    "uuid": "2669a51a-ab53-4f1f-96d7-18f79fa0138a",
+    "created_at": "2025-05-02T19:27:34.635022",
+    "updated_at": "2025-05-02T19:28:00.779612",
+    "model": "default",
+    "is_favorite": false,
+    "tags": []
+  },
+  "messages": [
+    {
+      "id": "haWDzR6oSzRDm3EiSb7oG",
+      "role": "user",
+      "type": "text",
+      "content": "open laravel.com website in the browser with  browser agent"
+    },
+    {
+      "id": "01305e71-c9d9-4493-82b6-74f08f39b478_coordinator_1",
+      "role": "assistant",
+      "type": "text",
+      "content": "handoff_to_planner()"
+    },
+    {
+      "id": "01305e71-c9d9-4493-82b6-74f08f39b478",
+      "role": "assistant",
+      "type": "workflow",
+      "content": {
+        "workflow": {
+          "id": "01305e71-c9d9-4493-82b6-74f08f39b478",
+          "name": "open laravel.com website in the browser with  browser agent",
+          "steps": [
+            {
+              "id": "01305e71-c9d9-4493-82b6-74f08f39b478_planner_2",
+              "agentId": "01305e71-c9d9-4493-82b6-74f08f39b478_planner_2",
+              "agentName": "planner",
+              "type": "agentic",
+              "isCompleted": false,
+              "tasks": [
+                {
+                  "id": "K--KGGE7ZHqt5FDVBjMuc",
+                  "type": "thinking",
+                  "state": "success",
+                  "payload": {
+                    "text": "```json\n{\n  \"thought\": \"The task is to open the Laravel website using the browser agent.\",\n  \"title\": \"Open Laravel Website\",\n  \"steps\": [\n    {\n      \"agent_name\": \"browser\",\n      \"title\": \"Open Laravel Website\",\n      \"description\": \"Use the browser agent to navigate to the Laravel website at 'https://laravel.com'.\",\n      \"note\": \"Ensure the website loads correctly and is displayed in the browser.\"\n    }\n  ]\n}\n```"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "01305e71-c9d9-4493-82b6-74f08f39b478_browser_4",
+              "agentId": "01305e71-c9d9-4493-82b6-74f08f39b478_browser_4",
+              "agentName": "browser",
+              "type": "agentic",
+              "isCompleted": false,
+              "tasks": [
+                {
+                  "id": "xpoN_8rXTSCcZq1ocBJYs",
+                  "type": "thinking",
+                  "state": "success",
+                  "payload": {
+                    "text": ""
+                  }
+                },
+                {
+                  "id": "01305e71-c9d9-4493-82b6-74f08f39b478_browser_browser_a951272f-7026-4043-871a-d19244263af8",
+                  "type": "tool_call",
+                  "state": "success",
+                  "payload": {
+                    "toolName": "browser",
+                    "input": {
+                      "instruction": "Go to laravel.com"
+                    },
+                    "output": "{\"result_content\": \"Successfully navigated to laravel.com.\", \"generated_gif_path\": \"history/browser_history/504d1735-cf16-4dd4-96da-e81f1d683d8f.gif\"}"
+                  }
+                },
+                {
+                  "id": "nPwy0K1tbF119q5VPL8uG",
+                  "type": "thinking",
+                  "state": "success",
+                  "payload": {
+                    "text": ""
+                  }
+                },
+                {
+                  "id": "X0NdOQRrwH6JsfcN6Fa88",
+                  "type": "thinking",
+                  "state": "success",
+                  "payload": {
+                    "text": ""
+                  }
+                },
+                {
+                  "id": "xsAT2NBAqIIH-qdi0p0-X",
+                  "type": "thinking",
+                  "state": "success",
+                  "payload": {
+                    "text": "I have successfully opened the Laravel website in the browser."
+                  }
+                }
+              ]
+            }
+          ],
+          "finalState": {},
+          "isCompleted": true
+        }
+      }
+    }
+  ]
+}

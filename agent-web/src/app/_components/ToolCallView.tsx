@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 import {
   GlobalOutlined,
   PythonOutlined,
@@ -16,7 +18,7 @@ import { LRUCache } from "lru-cache";
 import { useMemo } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs";
-
+import { getApiUrl } from "~/core/api/api-url-store";
 import { type ToolCallTask } from "~/core/workflow";
 
 export function ToolCallView({ task }: { task: ToolCallTask }) {
@@ -49,20 +51,98 @@ export function ToolCallView({ task }: { task: ToolCallTask }) {
   }
   return <div>{task.payload.toolName}</div>;
 }
-
 function BrowserToolCallView({
   task,
 }: {
   task: ToolCallTask<{ instruction: string }>;
 }) {
+  const [isPending, setIsPending] = useState(task.state === "pending");
+  
+  // Update isPending whenever task.state changes
+  useEffect(() => {
+    setIsPending(task.state === "pending");
+  }, [task.state]);
+  
+  const parsedOutput = useMemo(() => {
+    if (!task.payload.output || task.state === "pending") return null;
+    try {
+      return JSON.parse(task.payload.output);
+    } catch (e) {
+      console.error("Failed to parse browser output:", e);
+      return null;
+    }
+  }, [task.payload.output, task.state]);
+
+  const gifFileName = useMemo(() => {
+    if (!parsedOutput?.generated_gif_path) return null;
+    
+    // Extract only the filename from the path
+    const pathParts = parsedOutput.generated_gif_path.split('/');
+    return pathParts[pathParts.length - 1].replace('"', '');
+  }, [parsedOutput]);
+
+  const gifDownloadUrl = useMemo(() => {
+    if (!gifFileName) return null;
+    return getApiUrl() + `/browser_history/${gifFileName}`;
+  }, [gifFileName]);
+
   return (
-    <div>
-      <div className="flex items-center gap-2">
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
         <div>
-          <GlobalOutlined className="h-4 w-4 text-sm" />
+          <GlobalOutlined className="h-4 w-4 text-sm text-blue-500" />
         </div>
         <div>
-          <span className="text-sm">{task.payload.input.instruction}</span>
+          <span className="text-sm font-medium">Browser Automation</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* Instruction section */}
+        <div className="flex flex-col mb-3">
+          <div className="text-xs text-gray-500 mb-1">Instruction:</div>
+          <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200">
+            {task.payload.input.instruction}
+          </div>
+        </div>
+        
+        {/* Result content when available */}
+        {!isPending && parsedOutput?.result_content && (
+          <div className="flex flex-col mt-4">
+            <div className="text-xs text-gray-500 mb-1">Result:</div>
+            <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200">
+              {parsedOutput.result_content}
+            </div>
+          </div>
+        )}
+        
+        {/* GIF download option when available */}
+        {!isPending && gifDownloadUrl && (
+          <div className="flex justify-center mt-4">
+            <a 
+              href={gifDownloadUrl}
+              download={gifFileName}
+              className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-2 rounded-lg border border-blue-200 transition-colors"
+            >
+              <GlobalOutlined />
+              <span>Download Browser Recording</span>
+            </a>
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Browsing...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Browser task completed
+            </div>
+          )}
         </div>
       </div>
     </div>
