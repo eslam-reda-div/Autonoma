@@ -67,7 +67,7 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
       
       // Actions
       loadChatHistory: async () => {
-        set({ isLoading: true });
+        set({ isLoading: false });
         try {
           const { filterFolderUuid, filterFavorites, searchQuery } = get();
           

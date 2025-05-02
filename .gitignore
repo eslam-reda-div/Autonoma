@@ -5,6 +5,7 @@ __pycache__/
 uv.lock
 
 agent-web/node_modules/
+node_modules/
 agent-web/Winget.msixbundle
 
 credentials.json

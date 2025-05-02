@@ -8,7 +8,7 @@ import { useStore, updateMessage, sendMessage } from "~/core/store";
 import { LoadingAnimation } from "./LoadingAnimation";
 import { WorkflowProgressView } from "./WorkflowProgressView";
 import { InputBox } from "./InputBox";
-import { EditOutlined } from "@ant-design/icons";
+import { EditOutlined, CopyOutlined, CheckOutlined } from "@ant-design/icons";
 
 export function MessageHistoryView({
   className,
@@ -102,6 +102,7 @@ function MessageView({
 }) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isHovering, setIsHovering] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
 
   // Close popup when clicking outside the image
@@ -129,6 +130,28 @@ function MessageView({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Copy message content to clipboard
+  const copyToClipboard = () => {
+    let textToCopy = "";
+    
+    if (message.type === "text") {
+      textToCopy = message.content as string;
+    } else if (message.type === "imagetext") {
+      textToCopy = message.content.text;
+    }
+    
+    navigator.clipboard.writeText(textToCopy)
+      .then(() => {
+        setCopySuccess(true);
+        setTimeout(() => {
+          setCopySuccess(false);
+        }, 1000); // Show check icon for 1 second
+      })
+      .catch(err => {
+        console.error('Failed to copy text: ', err);
+      });
   };
 
   if (isEditing) {
@@ -176,26 +199,17 @@ function MessageView({
   if (message.type === "text" && message.content) {
     return (
       <div 
-        className={cn("flex", message.role === "user" && "justify-end")}
+        className={cn("flex flex-col", message.role === "user" && "items-end")}
         onMouseEnter={() => message.role === "user" && setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       >
         <div
           className={cn(
-            "relative mb-8 w-fit max-w-[95%] sm:max-w-[90%] md:max-w-[75%] lg:max-w-[560px] rounded-2xl px-4 py-3 shadow-xs",
+            "mb-1 w-fit max-w-[95%] sm:max-w-[90%] md:max-w-[75%] lg:max-w-[560px] rounded-2xl px-4 py-3 shadow-xs",
             message.role === "user" && "rounded-ee-none bg-blue-500 text-white",
             message.role === "assistant" && "rounded-es-none bg-white",
           )}
         >
-          {message.role === "user" && isHovering && (
-            <button 
-              className="absolute -left-10 top-2 text-gray-500 hover:text-gray-700 transition-colors"
-              onClick={onStartEditing}
-              aria-label="Edit message"
-            >
-              <EditOutlined className="h-4 w-4" />
-            </button>
-          )}
           <Markdown
             components={{
               a: ({ href, children }) => (
@@ -208,32 +222,54 @@ function MessageView({
             {message.content}
           </Markdown>
         </div>
+        
+        {message.role === "user" && isHovering && (
+          <div className="flex space-x-2 mb-8 text-sm text-gray-500">
+            <button 
+              className="flex items-center hover:text-gray-700 transition-colors"
+              onClick={onStartEditing}
+              aria-label="Edit message"
+            >
+              <EditOutlined className="h-3.5 w-3.5 mr-1" />
+              <span>Edit</span>
+            </button>
+            <button 
+              className="flex items-center hover:text-gray-700 transition-colors"
+              onClick={copyToClipboard}
+              aria-label="Copy message"
+            >
+              {copySuccess ? (
+                <>
+                  <CheckOutlined className="h-3.5 w-3.5 mr-1 text-green-500" />
+                  <span className="text-green-500">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <CopyOutlined className="h-3.5 w-3.5 mr-1" />
+                  <span>Copy</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+        {!isHovering && <div className="mb-8"></div>}
       </div>
     );
   } else if (message.type === "imagetext" && message.content) {
     return (
       <>
         <div 
-          className={cn("flex", message.role === "user" && "justify-end")}
+          className={cn("flex flex-col", message.role === "user" && "items-end")}
           onMouseEnter={() => message.role === "user" && setIsHovering(true)}
           onMouseLeave={() => setIsHovering(false)}
         >
           <div
             className={cn(
-              "relative mb-8 w-fit max-w-[95%] sm:max-w-[90%] md:max-w-[75%] lg:max-w-[560px] rounded-2xl px-4 py-3 shadow-xs",
+              "mb-1 w-fit max-w-[95%] sm:max-w-[90%] md:max-w-[75%] lg:max-w-[560px] rounded-2xl px-4 py-3 shadow-xs",
               message.role === "user" && "rounded-ee-none bg-blue-500 text-white",
               message.role === "assistant" && "rounded-es-none bg-white",
             )}
           >
-            {message.role === "user" && isHovering && (
-              <button 
-                className="absolute -left-10 top-2 text-gray-500 hover:text-gray-700 transition-colors"
-                onClick={onStartEditing}
-                aria-label="Edit message"
-              >
-                <EditOutlined className="h-4 w-4" />
-              </button>
-            )}
             {message.content.images && message.content.images.length > 0 && (
               <div className="flex flex-wrap flex-col gap-2 mb-3">
                 {message.content.images.map((image, index) => (
@@ -271,6 +307,37 @@ function MessageView({
               {message.content.text}
             </Markdown>
           </div>
+          
+          {message.role === "user" && isHovering && (
+            <div className="flex space-x-2 mb-8 text-sm text-gray-500">
+              <button 
+                className="flex items-center hover:text-gray-700 transition-colors"
+                onClick={onStartEditing}
+                aria-label="Edit message"
+              >
+                <EditOutlined className="h-3.5 w-3.5 mr-1" />
+                <span>Edit</span>
+              </button>
+              <button 
+                className="flex items-center hover:text-gray-700 transition-colors"
+                onClick={copyToClipboard}
+                aria-label="Copy message"
+              >
+                {copySuccess ? (
+                  <>
+                    <CheckOutlined className="h-3.5 w-3.5 mr-1 text-green-500" />
+                    <span className="text-green-500">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <CopyOutlined className="h-3.5 w-3.5 mr-1" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+          {!isHovering && <div className="mb-8"></div>}
         </div>
 
         {/* Image Popup */}

@@ -74,10 +74,17 @@ export default function HomePage() {
       try {
         // Prepare chat data to save
         const firstUserMessage = messages.find(m => m.role === "user");
-        const title = firstUserMessage 
-          ? firstUserMessage.content.toString().substring(0, 20) 
-          : "New Chat";
-          
+        // Extract title based on message type
+        let title = "New Chat";
+        
+        if (firstUserMessage) {
+          if (firstUserMessage.type === "text") {
+            title = firstUserMessage.content.toString().substring(0, 20);
+          } else if (firstUserMessage.type === "imagetext" && typeof firstUserMessage.content === "object") {
+            title = firstUserMessage.content.text.substring(0, 20);
+          }
+        }
+        
         const chatData = {
           title: title + (title.length >= 20 ? "..." : ""),
           messages: messages,

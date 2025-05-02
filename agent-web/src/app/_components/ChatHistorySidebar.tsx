@@ -728,22 +728,12 @@ function ChatHistoryListItem({ chat, isActive }: { chat: ChatHistoryItem; isActi
       </div>
 
       <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 text-gray-400 hover:text-yellow-500 opacity-0 group-hover:opacity-100"
-          onClick={() => toggleFavorite(chat.uuid)}
-          title={chat.is_favorite ? "Remove from favorites" : "Add to favorites"}
-        >
-          <StarIcon className="h-3.5 w-3.5" fill={chat.is_favorite ? "currentColor" : "none"} />
-        </Button>
-
         <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 opacity-0 group-hover:opacity-100"
+              className="h-6 w-6"
             >
               <Ellipsis className="h-3.5 w-3.5" />
             </Button>
