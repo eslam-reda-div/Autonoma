@@ -764,32 +764,96 @@ async function exportToPDF(
   return Promise.resolve();
 }
 
-// Rest of the export functions (TEXT, JSON, HTML) stay the same
+// Exports a chat conversation to a plain text file with improved formatting
 function exportToText(messages: Message[]): Promise<void> {
-  let text = "===== CHAT EXPORT =====\n\n";
+  const spacer = "\n" + "=".repeat(70) + "\n\n";
+  let text = "==================== AUTONOMA CHAT EXPORT ====================\n\n";
+  text += `Generated on: ${new Date().toLocaleString()}\n`;
+  text += `Number of messages: ${messages.length}\n`;
+  text += spacer;
   
-  messages.forEach(message => {
-    const role = message.role === "user" ? "You" : "Assistant";
+  messages.forEach((message, index) => {
+    const role = message.role === "user" ? "YOU" : "ASSISTANT";
+    text += `### ${role} (Message ${index + 1}) ###\n\n`;
     
     if (message.type === "text") {
-      text += `${role}: ${message.content}\n\n`;
+      text += `${message.content}\n`;
     } else if (message.type === "imagetext") {
-      text += `${role}: ${message.content.text}\n`;
+      text += `${message.content.text}\n`;
+      
       if (message.content.images && message.content.images.length > 0) {
-        text += `[Contains ${message.content.images.length} image(s)]\n`;
-      }
-      text += "\n";
-    } else if (message.type === "workflow") {
-      text += `${role}: [Workflow: ${message.content.workflow?.name}]\n`;
-      if (message.content.workflow?.steps) {
-        text += "Steps:\n";
-        message.content.workflow.steps.forEach((step: WorkflowStep, index: number) => {
-          text += `  ${index + 1}. ${getStepName(step)}\n`;
+        text += `\n[This message contains ${message.content.images.length} image(s)]\n`;
+        message.content.images.forEach((img, i) => {
+          text += `  Image ${i + 1}: ${img}\n`;
         });
       }
-      text += "\n";
+    } else if (message.type === "workflow") {
+      const workflow = message.content.workflow;
+      
+      text += `WORKFLOW: ${workflow?.name || "Untitled Workflow"}\n`;
+      text += "-".repeat(70) + "\n\n";
+      
+      if (workflow?.steps) {
+        text += `Total steps: ${workflow.steps.length}\n\n`;
+        
+        workflow.steps.forEach((step: WorkflowStep, stepIndex: number) => {
+          text += `STEP ${stepIndex + 1}: ${getStepName(step)}\n`;
+          text += `Agent: ${step.agentName}\n`;
+          text += "-".repeat(50) + "\n\n";
+          
+          if (step.tasks && Array.isArray(step.tasks)) {
+            step.tasks.forEach((task: Task, taskIndex: number) => {
+              text += `Task ${taskIndex + 1}: ${task.type.toUpperCase()} (${task.state})\n`;
+              
+              if (task.type === "thinking" && task.payload) {
+                if (task.payload.text) {
+                  text += "Content:\n";
+                  text += "------------------\n";
+                  text += `${task.payload.text}\n`;
+                  text += "------------------\n";
+                }
+                if (task.payload.reason) {
+                  text += `Reason: ${task.payload.reason}\n`;
+                }
+              } else if (task.type === "tool_call" && task.payload) {
+                text += `Tool: ${formatToolName(task.payload.toolName)}\n\n`;
+                
+                // Input details
+                text += "Input:\n";
+                text += "```\n";
+                text += JSON.stringify(task.payload.input, null, 2) + "\n";
+                text += "```\n\n";
+                
+                // Output details
+                if (task.payload.output) {
+                  text += "Output:\n";
+                  text += "```\n";
+                  
+                  // Try to format the output nicely if it's JSON
+                  try {
+                    // Check if it's a JSON string
+                    const parsed = JSON.parse(task.payload.output);
+                    text += JSON.stringify(parsed, null, 2);
+                  } catch (e) {
+                    // Not JSON, use as-is
+                    text += task.payload.output;
+                  }
+                  
+                  text += "\n```\n";
+                }
+              }
+              
+              text += "\n" + "-".repeat(40) + "\n\n";
+            });
+          }
+        });
+      }
     }
+    
+    text += spacer;
   });
+  
+  text += "==================== END OF EXPORT ====================\n";
   
   // Create a downloadable text file
   const blob = new Blob([text], { type: "text/plain" });

@@ -3,7 +3,7 @@
     "title": "what is the name of ...",
     "uuid": "79dfbfd1-8c6b-4014-ab83-9de1bf849199",
     "created_at": "2025-05-02T12:10:39.605227",
-    "updated_at": "2025-05-02T14:45:21.226027",
+    "updated_at": "2025-05-02T20:38:27.634470",
     "model": "default",
     "is_favorite": false,
     "tags": []
@@ -25,6 +25,30 @@
       "role": "assistant",
       "type": "text",
       "content": "The names of the tables in the image are:\n\n1. PATIENT  \n2. DOCTOR  \n3. TREATMENT  \n4. PATIENT_TREATMENT  "
+    },
+    {
+      "id": "eCIJCP1ftqZ19hx6TShdC",
+      "role": "user",
+      "type": "text",
+      "content": "what is your name"
+    },
+    {
+      "id": "b116c004-cae6-452b-bada-3170ff5dd79e_coordinator_53",
+      "role": "assistant",
+      "type": "text",
+      "content": "Hello! I'm Autonoma, your friendly AI assistant. How can I assist you today?"
+    },
+    {
+      "id": "QomUFWR0XrGU4vn-PgF_G",
+      "role": "user",
+      "type": "text",
+      "content": "what can you do by your self"
+    },
+    {
+      "id": "34686d9f-6b2c-40a0-85f8-0d7a44098f9b_coordinator_56",
+      "role": "assistant",
+      "type": "text",
+      "content": "I specialize in handling greetings, engaging in small talk, and assisting with simple interactions. For more complex tasks, I hand them off to a specialized planner to ensure you get the best assistance possible. If there's anything specific you'd like to know or discuss, feel free to ask!"
     }
   ]
 }

@@ -72,7 +72,7 @@ export function MessageHistoryView({
             void sendMessage(updatedMessage, {
               deepThinkingMode: options.deepThinkingMode,
               searchBeforePlanning: options.searchBeforePlanning
-            });
+            }, messages);
             
             // Exit edit mode
             setEditingMessageId(null);
