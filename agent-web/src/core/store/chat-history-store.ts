@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getApiUrl } from "../api/api-url-store";
+import { Message } from "../messaging";
 
 // Types for chat history items
 export interface ChatHistoryItem {
@@ -50,6 +51,8 @@ interface ChatHistoryState {
   setFilterFolder: (folderUuid: string | "global" | null) => void;
   toggleSidebar: () => void;
   setSidebar: (isOpen: boolean) => void;
+  getChatContent: () => Promise<{messages: Message[]} | null>;
+  getChatContentSync: () => {messages: Message[]} | null;
 }
 
 export const useChatHistoryStore = create<ChatHistoryState>()(
@@ -199,6 +202,56 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
         }
       },
       
+      getChatContent: async () => {
+        const { currentChatUuid } = get();
+        
+        if (!currentChatUuid) {
+          return null;
+        }
+        
+        try {
+          const response = await fetch(getApiUrl() + `/chat/history/${currentChatUuid}`);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to load chat content: ${response.statusText}`);
+          }
+          
+          const data = await response.json();
+          // Update cache
+          return data;
+        } catch (error) {
+          console.error("Error loading chat content:", error);
+          return null;
+        }
+      },
+      
+      // Add a new synchronous version that doesn't return a Promise
+      getChatContentSync: () => {
+        const { currentChatUuid } = get();
+        
+        if (!currentChatUuid) {
+          return null;
+        }
+        
+        try {
+          // Use XMLHttpRequest in synchronous mode (deprecated but works for this use case)
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', getApiUrl() + `/chat/history/${currentChatUuid}`, false); // false makes it synchronous
+          xhr.send(null);
+          
+          if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
+            return data;
+          } else {
+            console.error(`Failed to load chat content: ${xhr.statusText}`);
+            return null;
+          }
+        } catch (error) {
+          console.error("Error loading chat content synchronously:", error);
+          return null;
+        }
+      },
+
       deleteChat: async (uuid) => {
         try {
           const response = await fetch(getApiUrl() + `/chat/history/${uuid}`, {

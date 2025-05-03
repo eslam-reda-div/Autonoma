@@ -3,7 +3,7 @@
     "title": "what is your name",
     "uuid": "abcacf36-ea15-44eb-be2e-e35182edeb7c",
     "created_at": "2025-05-02T20:35:21.077101",
-    "updated_at": "2025-05-03T15:46:06.942609",
+    "updated_at": "2025-05-03T19:51:19.176582",
     "model": "default",
     "is_favorite": false,
     "tags": []
@@ -68,6 +68,30 @@
       "role": "assistant",
       "type": "text",
       "content": "I don't have an age like humans do, but I was developed by Eslam Reda and trained on data up to October 2023. How about you?"
+    },
+    {
+      "id": "BE0ExerkUswJh2CKClPGX",
+      "role": "user",
+      "type": "text",
+      "content": "what is your name"
+    },
+    {
+      "id": "5c3af5bb-a1f2-43b0-8433-e3b2a95f1b85_coordinator_52",
+      "role": "assistant",
+      "type": "text",
+      "content": "Hello! My name is Autonoma. How can I assist you today?"
+    },
+    {
+      "id": "tnKwM2s38BJCW5mjRwJBT",
+      "role": "user",
+      "type": "text",
+      "content": "what is the first message i send to you by your self"
+    },
+    {
+      "id": "a6df3f87-3df6-42ba-85f2-cebdd39c8826_coordinator_22",
+      "role": "assistant",
+      "type": "text",
+      "content": "You asked me, \"what is your name.\" 😊 How can I assist you further?"
     }
   ]
 }

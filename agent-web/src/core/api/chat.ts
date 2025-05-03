@@ -1,6 +1,6 @@
 import { type Message } from "../messaging";
 import { fetchStream } from "../sse";
-
+import { useChatHistoryStore } from "../store";
 import { getApiUrl } from "./api-url-store";
 import { type TeamMember, type ChatEvent } from "./types";
 
@@ -75,23 +75,19 @@ export function chatStream(
     };
   }
 
-  // Construct the complete API request payload
+  const chatContent = useChatHistoryStore.getState().getChatContentSync();
+
   const apiRequestBody = {
     // TODO: add `thread_id` in the future
-    messages: [messagePayload],
+    messages: chatContent?.messages && Array.isArray(chatContent.messages) 
+      ? [...chatContent.messages, messagePayload] 
+      : [messagePayload],
     deep_thinking_mode: params.deepThinkingMode,
     search_before_planning: params.searchBeforePlanning,
     debug: location.search.includes("debug") && !location.search.includes("debug=false"),
     team_members: params.teamMembers,
   };
-
-  // Log the request for debugging
-  console.log('Sending chat request:', {
-    ...apiRequestBody,
-    // Truncate image data in logs for readability
-    
-  });
-
+  
   return fetchStream<ChatEvent>(
     getBaseApiUrl() + "/chat/stream",
     {
