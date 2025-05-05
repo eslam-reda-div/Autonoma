@@ -175,6 +175,14 @@ async def chat_endpoint(request: ChatRequest, req: Request):
                                 }
                             }
                         )
+                    elif item.type == "input_file" and item.filename and item.file_data:
+                        content_items.append(
+                            {
+                                "type": "input_file",
+                                "filename": item.filename,
+                                "file_data": item.file_data,
+                            }
+                        )
 
                 message_dict["content"] = content_items
 
