@@ -95,6 +95,7 @@ export async function sendMessage(
     searchBeforePlanning: boolean;
   },
   options: { abortSignal?: AbortSignal } = {},
+  messagesToKept: Message[] = [],
 ) {
   addMessage(message);
   let stream: AsyncIterable<ChatEvent>;
@@ -109,6 +110,7 @@ export async function sendMessage(
         teamMembers: useStore.getState().enabledTeamMembers,
       },
       options,
+      messagesToKept,
     );
   }
   setResponding(true);

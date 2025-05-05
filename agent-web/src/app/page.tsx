@@ -145,7 +145,8 @@ export default function HomePage() {
       config: { 
         deepThinkingMode: boolean; 
         searchBeforePlanning: boolean; 
-        images?: string[] 
+        images?: string[];
+        files?: { type: string; filename: string; file_data: string }[];
       },
     ) => {
       const abortController = new AbortController();
@@ -153,15 +154,16 @@ export default function HomePage() {
       
       let message: TextMessage | ImageTextMessage;
       
-      if (config.images && config.images.length > 0) {
-        // Message with images
+      if ((config.images && config.images.length > 0) || (config.files && config.files.length > 0)) {
+        // Message with images and/or files
         message = {
           id: nanoid(),
           role: "user" as MessageRole,
           type: "imagetext",
           content: {
             text: content,
-            images: config.images
+            images: config.images || [],
+            files: config.files || []
           },
         };
       } else {

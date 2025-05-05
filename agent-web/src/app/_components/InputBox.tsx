@@ -6,6 +6,9 @@ import {
   TranslationOutlined,
   PictureOutlined,
   CloseCircleOutlined,
+  FileOutlined,
+  UploadOutlined,
+  FilePdfOutlined,
 } from "@ant-design/icons";
 import { type KeyboardEvent, useCallback, useEffect, useState, useRef, ChangeEvent } from "react";
 
@@ -36,17 +39,19 @@ export function InputBox({
   onCancel,
   initialText = "",
   initialImages = [],
+  initialFiles = [],
 }: {
   className?: string;
   size?: "large" | "normal";
   responding?: boolean;
   onSend?: (
     message: string,
-    options: { deepThinkingMode: boolean; searchBeforePlanning: boolean; images?: string[] },
+    options: { deepThinkingMode: boolean; searchBeforePlanning: boolean; images?: string[]; files?: { type: string; filename: string; file_data: string }[] },
   ) => void;
   onCancel?: () => void;
   initialText?: string;
   initialImages?: string[];
+  initialFiles?: { type: string; filename: string; file_data: string }[];
 }) {
   const teamMembers = useStore((state) => state.teamMembers);
   const enabledTeamMembers = useStore((state) => state.enabledTeamMembers);
@@ -60,8 +65,12 @@ export function InputBox({
   const [images, setImages] = useState<{ base64: string; file?: File }[]>(
     initialImages.map(image => ({ base64: image }))
   );
+  const [files, setFiles] = useState<{ base64: string; filename: string; type: string; file?: File }[]>(
+    initialFiles.map(file => ({ base64: file.file_data, filename: file.filename, type: file.type }))
+  );
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const documentFileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -80,9 +89,23 @@ export function InputBox({
         return;
       }
       if (onSend) {
-        onSend(message, { deepThinkingMode, searchBeforePlanning, images: images.map((img) => img.base64) });
+        const imageUrls = images.map((img) => img.base64);
+        const fileItems = files.map((file) => ({
+          type: "input_file",
+          filename: file.filename,
+          file_data: file.base64,
+        }));
+        
+        // Clear message state after sending
+        onSend(message, { 
+          deepThinkingMode, 
+          searchBeforePlanning, 
+          images: imageUrls,
+          files: fileItems
+        });
         setMessage("");
         setImages([]);
+        setFiles([]);
       }
     }
   }, [
@@ -93,6 +116,7 @@ export function InputBox({
     deepThinkingMode,
     searchBeforePlanning,
     images,
+    files,
   ]);
 
   const handleKeyDown = useCallback(
@@ -257,6 +281,48 @@ export function InputBox({
     }
   }, []);
 
+  const handleFileUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    try {
+      const newFiles: Array<{ base64: string; filename: string; type: string; file: File }> = [];
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file) continue;
+        
+        // Only process PDF files
+        if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+          console.warn(`Skipping non-PDF file: ${file.name}`);
+          continue;
+        }
+        
+        const base64 = await fileToBase64(file);
+        
+        // Add to the files array (PDFs only)
+        newFiles.push({ 
+          base64, 
+          filename: file.name,
+          type: file.type,
+          file 
+        });
+      }
+      
+      // Update files array
+      setFiles(prev => [...prev, ...newFiles]);
+    } catch (error) {
+      console.error('Error processing files:', error);
+    } finally {
+      setIsUploading(false);
+      if (documentFileInputRef.current) {
+        documentFileInputRef.current.value = ''; // Reset file input
+      }
+    }
+  }, []);
+
   const handleImageUploadClick = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
@@ -265,13 +331,17 @@ export function InputBox({
     setImages(prev => prev.filter((_, i) => i !== index));
   }, []);
 
+  const handleRemoveFile = useCallback((index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
   return (
     <div className={cn(className)}>
       {/* Images preview section - moved above the text input */}
-      {images.length > 0 && (
+      {(images.length > 0 || files.length > 0) && (
         <div className="flex flex-wrap gap-2 px-2 py-2 sm:px-3 md:px-4 border-b border-gray-100">
           {images.map((image, index) => (
-            <div key={index} className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 overflow-hidden rounded-md shadow-sm border border-gray-200 group">
+            <div key={`img-${index}`} className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 overflow-hidden rounded-md shadow-sm border border-gray-200 group">
               <img
                 src={image.base64}
                 alt={`Uploaded ${index}`}
@@ -288,6 +358,26 @@ export function InputBox({
               </Button>
             </div>
           ))}
+          
+          {files.map((file, index) => (
+            <div key={`file-${index}`} className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 overflow-hidden rounded-md shadow-sm border border-gray-200 group">
+              <div className="w-full h-full flex flex-col items-center justify-center p-2 bg-gray-50">
+                <FileOutlined className="text-blue-500 text-xl sm:text-2xl md:text-3xl mb-1" />
+                <div className="text-xs text-center truncate w-full">{file.filename}</div>
+                <div className="text-[10px] text-gray-500">{(file.file?.size ? Math.round(file.file.size / 1024) : 0)} KB</div>
+              </div>
+              <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-20 transition-opacity"></div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="absolute top-1 right-1 h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 rounded-full bg-white bg-opacity-80 hover:bg-opacity-100 border-none shadow-md text-red-500 hover:text-red-600 hover:bg-red-50 transition-all"
+                onClick={() => handleRemoveFile(index)}
+              >
+                <CloseCircleOutlined className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4" />
+              </Button>
+            </div>
+          ))}
+          
           {isUploading && (
             <div className="relative w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 border border-dashed border-gray-300 rounded-md flex items-center justify-center bg-gray-50">
               <div className="animate-pulse text-blue-500">
@@ -428,21 +518,42 @@ export function InputBox({
           </Tooltip>
 
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className={cn(
-                  "h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 rounded-full",
-                  isUploading ? "bg-gray-100 border-gray-300 text-gray-500" : "bg-button",
-                )}
-                onClick={handleImageUploadClick}
-              >
-                <PictureOutlined className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              </Button>
-            </TooltipTrigger>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className={cn(
+                      "h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 rounded-full",
+                      isUploading ? "bg-gray-100 border-gray-300 text-gray-500" : "bg-button",
+                    )}
+                  >
+                    <UploadOutlined className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </Button>
+                </TooltipTrigger>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuLabel>Upload Files</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <div 
+                  className="flex items-center gap-2 px-2 py-2 hover:bg-blue-50 cursor-pointer rounded-md"
+                  onClick={handleImageUploadClick}
+                >
+                  <PictureOutlined className="h-4 w-4 text-blue-500" />
+                  <span>Upload Images</span>
+                </div>
+                <div 
+                  className="flex items-center gap-2 px-2 py-2 hover:bg-blue-50 cursor-pointer rounded-md"
+                  onClick={() => documentFileInputRef.current?.click()}
+                >
+                  <FilePdfOutlined className="h-4 w-4 text-red-500" />
+                  <span>Upload PDF Files</span>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <TooltipContent>
-              <p>Upload Images</p>
+              <p>Upload Files</p>
             </TooltipContent>
           </Tooltip>
         </div>
@@ -534,6 +645,14 @@ export function InputBox({
         accept="image/*"
         multiple
         onChange={handleFileChange}
+      />
+      <input
+        type="file"
+        ref={documentFileInputRef}
+        className="hidden"
+        accept=".pdf,application/pdf" /* Only accept PDF files */
+        multiple
+        onChange={handleFileUpload}
       />
     </div>
   );

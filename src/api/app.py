@@ -65,6 +65,12 @@ class ContentItem(BaseModel):
     image_url: Optional[str] = Field(
         None, description="The image URL if type is 'image'"
     )
+    filename: Optional[str] = Field(
+        None, description="The filename if type is 'input_file'"
+    )
+    file_data: Optional[str] = Field(
+        None, description="The base64 encoded file data if type is 'input_file'"
+    )
 
 
 class ChatMessage(BaseModel):
@@ -155,7 +161,6 @@ async def chat_endpoint(request: ChatRequest, req: Request):
         messages = []
         for msg in request.messages:
             message_dict = {"role": msg.role}
-
             # Handle both string content and list of content items
             if isinstance(msg.content, str):
                 message_dict["content"] = msg.content
@@ -176,13 +181,16 @@ async def chat_endpoint(request: ChatRequest, req: Request):
                             }
                         )
                     elif item.type == "input_file" and item.filename and item.file_data:
-                        content_items.append(
-                            {
-                                "type": "input_file",
-                                "filename": item.filename,
-                                "file_data": item.file_data,
-                            }
-                        )
+                        if item.file_data and ("application/pdf" in item.file_data or item.filename.lower().endswith('.pdf')):
+                            content_items.append(
+                                {
+                                    "type": "file",
+                                    "file": {
+                                        "filename": item.filename,
+                                        "file_data": item.file_data,
+                                    }
+                                }
+                            )
 
                 message_dict["content"] = content_items
 

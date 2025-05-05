@@ -19,13 +19,15 @@ export function chatStream(
     teamMembers: string[];
   },
   options: { abortSignal?: AbortSignal } = {},
+  messagesToKept: Message[] = [],
 ) {
   let messagePayload;
   let messageContent;
 
   if (userMessage.type === "imagetext") {
     // Format message with image for the backend API
-    const images = userMessage.content.images;
+    const images = userMessage.content.images || [];
+    const files = userMessage.content.files || [];
     const text = userMessage.content.text;
     
     // Process images to ensure compatibility with the backend
@@ -41,10 +43,11 @@ export function chatStream(
     
     // For image messages, use a simpler format that the backend can process
     messageContent = text;
-    // Create an array for the content that will contain the text and images
+    // Create an array for the content that will contain the text, images, and files
     type ContentItem = 
       | { type: "text"; text: string }
-      | { type: "image_url"; image_url: string };
+      | { type: "image_url"; image_url: string }
+      | { type: "input_file"; filename: string; file_data: string};
       
     const contentArray: ContentItem[] = [
       {
@@ -58,6 +61,15 @@ export function chatStream(
       contentArray.push({
         type: "image_url",
         image_url: image,
+      });
+    }
+    
+    // Loop through each file and add it individually
+    for (const file of files) {
+      contentArray.push({
+        type: "input_file",
+        filename: file.filename,
+        file_data: file.file_data,
       });
     }
     
@@ -75,7 +87,12 @@ export function chatStream(
     };
   }
 
-  const chatContent = useChatHistoryStore.getState().getChatContentSync();
+  var chatContent: {messages:Message[]} | null = {messages: []};
+  if(messagesToKept.length > 0) {
+    chatContent.messages = messagesToKept
+  }else{
+    chatContent = useChatHistoryStore.getState().getChatContentSync();
+  }
 
   const apiRequestBody = {
     // TODO: add `thread_id` in the future
@@ -87,6 +104,8 @@ export function chatStream(
     debug: location.search.includes("debug") && !location.search.includes("debug=false"),
     team_members: params.teamMembers,
   };
+
+  console.log(apiRequestBody);
   
   return fetchStream<ChatEvent>(
     getBaseApiUrl() + "/chat/stream",

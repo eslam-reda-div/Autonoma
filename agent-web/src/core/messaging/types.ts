@@ -17,6 +17,11 @@ export interface TextMessage extends GenericMessage<"text", string> {}
 export interface ImageTextMessage extends GenericMessage<"imagetext", {
   text: string;
   images: string[];
+  files?: {
+    type: string;
+    filename: string;
+    file_data: string;
+  }[];
 }> {}
 
 export interface WorkflowMessage

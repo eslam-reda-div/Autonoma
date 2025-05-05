@@ -8,7 +8,7 @@ import { useStore, updateMessage, sendMessage } from "~/core/store";
 import { LoadingAnimation } from "./LoadingAnimation";
 import { WorkflowProgressView } from "./WorkflowProgressView";
 import { InputBox } from "./InputBox";
-import { EditOutlined, CopyOutlined, CheckOutlined } from "@ant-design/icons";
+import { EditOutlined, CopyOutlined, CheckOutlined, FileOutlined, DownloadOutlined } from "@ant-design/icons";
 
 export function MessageHistoryView({
   className,
@@ -41,19 +41,18 @@ export function MessageHistoryView({
             // Remove all messages after the current one (including the current one)
             const messagesToKeep = storeMessages.slice(0, currentIndex);
             
-            console.log("Messages to keep:", messagesToKeep);
-
             // Create the updated message
             let updatedMessage: Message;
             
-            if (options.images && options.images.length > 0) {
+            if ((options.images && options.images.length > 0) || (options.files && options.files.length > 0)) {
               updatedMessage = {
                 id: message.id,
                 role: "user",
                 type: "imagetext",
                 content: {
                   text: text,
-                  images: options.images
+                  images: options.images || [],
+                  files: options.files || []
                 }
               };
             } else {
@@ -72,7 +71,7 @@ export function MessageHistoryView({
             void sendMessage(updatedMessage, {
               deepThinkingMode: options.deepThinkingMode,
               searchBeforePlanning: options.searchBeforePlanning
-            });
+            }, {}, messagesToKeep);
             
             // Exit edit mode
             setEditingMessageId(null);
@@ -97,7 +96,12 @@ function MessageView({
   isEditing: boolean;
   onStartEditing: () => void;
   onCancelEditing: () => void;
-  onSaveEdit: (text: string, options: { deepThinkingMode: boolean; searchBeforePlanning: boolean; images?: string[] }) => void;
+  onSaveEdit: (text: string, options: { 
+    deepThinkingMode: boolean; 
+    searchBeforePlanning: boolean; 
+    images?: string[];
+    files?: { type: string; filename: string; file_data: string }[];
+  }) => void;
   nextMessages: Message[];
 }) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -132,6 +136,16 @@ function MessageView({
     document.body.removeChild(link);
   };
 
+  // Handle file download
+  const handleFileDownload = (fileData: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = fileData;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Copy message content to clipboard
   const copyToClipboard = () => {
     let textToCopy = "";
@@ -155,15 +169,17 @@ function MessageView({
   };
 
   if (isEditing) {
-    // Determine initial content and images for InputBox
+    // Determine initial content, images, and files for InputBox
     let initialText = "";
     let initialImages: string[] = [];
+    let initialFiles: { type: string; filename: string; file_data: string }[] = [];
     
     if (message.type === "text") {
       initialText = message.content as string;
     } else if (message.type === "imagetext") {
       initialText = message.content.text;
       initialImages = message.content.images || [];
+      initialFiles = message.content.files || [];
     }
     
     return (
@@ -182,6 +198,7 @@ function MessageView({
           responding={false}
           initialText={initialText}
           initialImages={initialImages}
+          initialFiles={initialFiles}
           onCancel={onCancelEditing}
           onSend={(text, options) => {
             onSaveEdit(text, options);
@@ -256,6 +273,9 @@ function MessageView({
       </div>
     );
   } else if (message.type === "imagetext" && message.content) {
+    // Check if message has files in content
+    const hasFiles = Array.isArray(message.content.files) && message.content.files.length > 0;
+    
     return (
       <>
         <div 
@@ -270,11 +290,12 @@ function MessageView({
               message.role === "assistant" && "rounded-es-none bg-white",
             )}
           >
+            {/* Images section */}
             {message.content.images && message.content.images.length > 0 && (
               <div className="flex flex-wrap flex-col gap-2 mb-3">
                 {message.content.images.map((image, index) => (
                     <div 
-                      key={index} 
+                      key={`img-${index}`}
                       className="relative overflow-hidden rounded-md bg-gray-50 flex justify-center"
                     >
                       <div 
@@ -292,6 +313,45 @@ function MessageView({
                 ))}
               </div>
             )}
+            
+            {/* Files section */}
+            {hasFiles && (
+              <div className="flex flex-wrap flex-col gap-2 mb-3">
+                {message.content.files?.map((file, index) => (
+                  <div 
+                    key={`file-${index}`}
+                    className={cn(
+                      "p-3 rounded-md flex items-center gap-3",
+                      message.role === "user" 
+                        ? "bg-blue-400 text-white" 
+                        : "bg-gray-50 text-gray-900 border border-gray-200"
+                    )}
+                  >
+                    <FileOutlined className={cn(
+                      "text-xl", 
+                      message.role === "user" ? "text-white" : "text-blue-500"
+                    )} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">{file.filename}</div>
+                    </div>
+                    <button 
+                      onClick={() => handleFileDownload(file.file_data, file.filename)}
+                      className={cn(
+                        "flex items-center justify-center h-8 w-8 rounded-full transition-colors",
+                        message.role === "user" 
+                          ? "bg-blue-300 hover:bg-blue-200 text-white" 
+                          : "bg-gray-200 hover:bg-gray-300 text-blue-500"
+                      )}
+                      title="Download file"
+                    >
+                      <DownloadOutlined />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Message text */}
             <Markdown
               components={{
                 a: ({ href, children }) => (
