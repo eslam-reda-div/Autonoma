@@ -60,7 +60,7 @@ graph = build_graph()
 
 
 class ContentItem(BaseModel):
-    type: str = Field(..., description="The type of content (text, image, etc.)")
+    type: Optional[str] = Field(..., description="The type of content (text, image, etc.)")
     text: Optional[str] = Field(None, description="The text content if type is 'text'")
     image_url: Optional[str] = Field(
         None, description="The image URL if type is 'image'"
@@ -74,10 +74,12 @@ class ContentItem(BaseModel):
 
 
 class ChatMessage(BaseModel):
+    id: Optional[str] = Field(None, description="Unique ID of the message")
     role: str = Field(
         ..., description="The role of the message sender (user or assistant)"
     )
-    content: Union[str, List[ContentItem]] = Field(
+    type: Optional[str] = Field(None, description="Type of the message (text, workflow, etc.)")
+    content: Union[str, List[ContentItem], Dict[str, Any], List[Dict[str, Any]]] = Field(
         ...,
         description="The content of the message, either a string or a list of content items",
     )
@@ -164,7 +166,7 @@ async def chat_endpoint(request: ChatRequest, req: Request):
             # Handle both string content and list of content items
             if isinstance(msg.content, str):
                 message_dict["content"] = msg.content
-            else:
+            elif isinstance(msg.content, list):
                 # For content as a list, convert to the format expected by the workflow
                 content_items = []
                 for item in msg.content:
@@ -193,6 +195,17 @@ async def chat_endpoint(request: ChatRequest, req: Request):
                             )
 
                 message_dict["content"] = content_items
+            elif isinstance(msg.content, dict):
+                # Handle dictionary content (like workflow)
+                if "workflow" in msg.content:
+                    # For workflow-type content, directly use the provided workflow data
+                    message_dict["type"] = "workflow"
+                    message_dict["content"] = {
+                        "workflow": msg.content["workflow"]
+                    }
+                # Handle any other dictionary content types
+                else:
+                    message_dict["content"] = msg.content
 
             messages.append(message_dict)
 

@@ -175,7 +175,6 @@ export default function HomePage() {
           content,
         };
       }
-      
       await sendMessage(
         message,
         {
@@ -183,6 +182,7 @@ export default function HomePage() {
           searchBeforePlanning: config.searchBeforePlanning,
         },
         { abortSignal: abortController.signal },
+        messages,
       );
       abortControllerRef.current = null;
     },

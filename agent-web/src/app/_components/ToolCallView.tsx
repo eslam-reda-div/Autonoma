@@ -13,6 +13,11 @@ import {
   EditOutlined,
   SwapOutlined,
   FileSearchOutlined,
+  YoutubeOutlined,
+  BookOutlined,
+  DollarOutlined,
+  CloudOutlined,
+  ApiOutlined,
 } from "@ant-design/icons";
 import { LRUCache } from "lru-cache";
 import { useMemo } from "react";
@@ -48,6 +53,20 @@ export function ToolCallView({ task }: { task: ToolCallTask }) {
     return <ReadFileToolCallView task={task as ToolCallTask<any>} />;
   } else if (task.payload.toolName === "write_file") {
     return <WriteFileToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "duck_duck_go_tool") {
+    return <DuckDuckGoToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "yahoo_finance_news_tool") {
+    return <YahooFinanceNewsToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "youtube_search_tool") {
+    return <YouTubeSearchToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "wikipedia_search_tool") {
+    return <WikipediaSearchToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "open_weather_map_search_tool") {
+    return <OpenWeatherMapSearchToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "hyperbrowser_extract_tool") {
+    return <HyperbrowserExtractToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "open_weather_map" || task.payload.toolName === "wikipedia" || task.payload.toolName === "youtube_search" || task.payload.toolName === "yahoo_finance_news" || task.payload.toolName === "duckduckgo_search") {
+    return
   }
   return <div>{task.payload.toolName}</div>;
 }
@@ -818,6 +837,520 @@ function WriteFileToolCallView({
             <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
               <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
               File written
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DuckDuckGoToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ query: string }>;
+}) {
+  const isPending = task.state === "pending";
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <SearchOutlined className="h-4 w-4 text-sm text-blue-500" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">DuckDuckGo Search</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* Search query section */}
+        <div className="flex items-center mb-3">
+          <div className="text-xs text-gray-500 w-24">Query:</div>
+          <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 flex-1">
+            {task.payload.input.query}
+          </div>
+        </div>
+        
+        {/* Results section */}
+        {!isPending && task.payload.output && (
+          <div className="mt-4">
+            <div className="text-xs text-gray-500 mb-2">Search Results:</div>
+            <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 max-h-[300px] overflow-y-auto">
+              <p className="whitespace-pre-wrap">{task.payload.output}</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Searching...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Search complete
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function YahooFinanceNewsToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ query: string }>;
+}) {
+  const isPending = task.state === "pending";
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <DollarOutlined className="h-4 w-4 text-sm text-green-600" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Yahoo Finance News</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* Search query section */}
+        <div className="flex items-center mb-3">
+          <div className="text-xs text-gray-500 w-24">Company/Ticker:</div>
+          <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 flex-1">
+            {task.payload.input.query}
+          </div>
+        </div>
+        
+        {/* Results section */}
+        {!isPending && task.payload.output && (
+          <div className="mt-4">
+            <div className="text-xs text-gray-500 mb-2">Financial News:</div>
+            <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 max-h-[300px] overflow-y-auto">
+              <p className="whitespace-pre-wrap">{task.payload.output}</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Fetching financial news...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Financial data retrieved
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function YouTubeSearchToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ query: string }>;
+}) {
+  const isPending = task.state === "pending";
+  const [videoDetails, setVideoDetails] = useState<{url: string; title: string}[]>([]);
+  
+  // Extract video links from the output
+  const videoLinks = useMemo(() => {
+    if (!task.payload.output || isPending) return [];
+    
+    try {
+      // Case 1: Output is a Python list as string
+      if (task.payload.output.startsWith('[') && task.payload.output.endsWith(']')) {
+        // Parse Python list format (remove the brackets and split by comma)
+        const linksString = task.payload.output.slice(1, -1);
+        return linksString.split(',')
+          .map(link => link.trim().replace(/'/g, '').replace(/"/g, ''))
+          .filter(link => link.includes('youtube.com'));
+      }
+      
+      // Case 2: Regular expression for URLs in text
+      const urlRegex = /(https?:\/\/(?:www\.)?youtube\.com\/(?:watch\?v=|shorts\/)[\w-]+(?:[^\s,'\[\]]*)?)/g;
+      const matches = [...task.payload.output.matchAll(urlRegex)];
+      return matches.map(match => match[0]);
+    } catch (error) {
+      console.error("Error parsing YouTube links:", error);
+      return [];
+    }
+  }, [task.payload.output, isPending]);
+  
+  // Fetch video titles when links change
+  useEffect(() => {
+    if (videoLinks.length === 0) return;
+    
+    const fetchVideoDetails = async () => {
+      const details = videoLinks.map(url => {
+        // Extract video ID
+        let videoId: string | undefined = '';
+        if (url.includes('watch?v=')) {
+          videoId = url.split('watch?v=')[1]?.split('&')[0];
+        } else if (url.includes('shorts/')) {
+          videoId = url.split('shorts/')[1]?.split('?')[0];
+        }
+        
+        // Return basic info with fallback title
+        return {
+          url,
+          title: `YouTube Video (${videoId})`,
+          videoId
+        };
+      });
+      
+      setVideoDetails(details);
+      
+      // Try to fetch actual titles using YouTube API or OEmbed (if implemented)
+      // This would be a place to add a fetch to your backend that could get titles
+      // For now, we'll use the ID as title as a fallback
+    };
+    
+    fetchVideoDetails();
+  }, [videoLinks]);
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <YoutubeOutlined className="h-4 w-4 text-sm text-red-600" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">YouTube Search</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* Search query section */}
+        <div className="flex items-center mb-3">
+          <div className="text-xs text-gray-500 w-24">Search Query:</div>
+          <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 flex-1">
+            {task.payload.input.query}
+          </div>
+        </div>
+        
+        {/* Results section */}
+        {!isPending && task.payload.output && (
+          <div className="mt-4">
+            <div className="text-xs text-gray-500 mb-2 flex items-center">
+              <YoutubeOutlined className="mr-1 text-red-500" /> 
+              {videoLinks.length > 0 ? `${videoLinks.length} videos found` : 'Search Results'}
+            </div>
+            
+            {videoLinks.length > 0 ? (
+              <div className="bg-white rounded border border-gray-200 p-2 max-h-[300px] overflow-y-auto">
+                <ul className="text-sm space-y-2">
+                  {videoDetails.length > 0 ? (
+                    videoDetails.map((video, index) => (
+                      <li 
+                        key={index} 
+                        className="animate-bg-blink rounded border border-gray-100 p-2"
+                        style={{animationDelay: `${index * 100}ms`}}
+                      >
+                        <a 
+                          href={video.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 flex items-center"
+                        >
+                          <YoutubeOutlined className="mr-2 text-red-500" />
+                          {video.title}
+                        </a>
+                      </li>
+                    ))
+                  ) : (
+                    // Fallback to just showing links while loading titles
+                    videoLinks.map((url, index) => (
+                      <li 
+                        key={index} 
+                        className="animate-bg-blink rounded border border-gray-100 p-2"
+                        style={{animationDelay: `${index * 100}ms`}}
+                      >
+                        <a 
+                          href={url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 flex items-center"
+                        >
+                          <YoutubeOutlined className="mr-2 text-red-500" />
+                          {url}
+                        </a>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+            ) : (
+              <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 max-h-[300px] overflow-y-auto">
+                <p className="whitespace-pre-wrap">{task.payload.output}</p>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Searching YouTube...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              YouTube search complete
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WikipediaSearchToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ query: string }>;
+}) {
+  const isPending = task.state === "pending";
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <BookOutlined className="h-4 w-4 text-sm text-gray-500" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Wikipedia Search</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* Search query section */}
+        <div className="flex items-center mb-3">
+          <div className="text-xs text-gray-500 w-24">Query:</div>
+          <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 flex-1">
+            {task.payload.input.query}
+          </div>
+        </div>
+        
+        {/* Results section */}
+        {!isPending && task.payload.output && (
+          <div className="mt-4">
+            <div className="text-xs text-gray-500 mb-2 flex items-center">
+              <BookOutlined className="mr-1" /> Wikipedia Results
+            </div>
+            <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 max-h-[300px] overflow-y-auto">
+              <p className="whitespace-pre-wrap">{task.payload.output}</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Searching Wikipedia...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Wikipedia search complete
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OpenWeatherMapSearchToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ location: string }>;
+}) {
+  const isPending = task.state === "pending";
+
+  // Attempt to extract weather data if structured
+  const weatherData = useMemo(() => {
+    if (!task.payload.output || isPending) return null;
+    
+    try {
+      // Check if the output is valid JSON
+      return JSON.parse(task.payload.output);
+    } catch {
+      // If not JSON, return null and display raw output
+      return null;
+    }
+  }, [task.payload.output, isPending]);
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <CloudOutlined className="h-4 w-4 text-sm text-blue-400" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Weather Information</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* Location section */}
+        <div className="flex items-center mb-3">
+          <div className="text-xs text-gray-500 w-24">Location:</div>
+          <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 flex-1">
+            {task.payload.input.location}
+          </div>
+        </div>
+        
+        {/* Weather results section */}
+        {!isPending && task.payload.output && (
+          <div className="mt-4">
+            <div className="text-xs text-gray-500 mb-2 flex items-center">
+              <CloudOutlined className="mr-1" /> Weather Information
+            </div>
+            
+            {weatherData ? (
+              // Display structured weather data
+              <div className="bg-white rounded border border-gray-200 p-3">
+                <pre className="text-xs font-mono whitespace-pre-wrap overflow-x-auto">
+                  {JSON.stringify(weatherData, null, 2)}
+                </pre>
+              </div>
+            ) : (
+              // Display raw text output
+              <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 max-h-[300px] overflow-y-auto">
+                <p className="whitespace-pre-wrap">{task.payload.output}</p>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Fetching weather data...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Weather data retrieved
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HyperbrowserExtractToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ website_url: string; prompt: string; extraction_schema?: string }>;
+}) {
+  const isPending = task.state === "pending";
+
+  // Parse JSON output if available
+  const extractedData = useMemo(() => {
+    if (!task.payload.output || isPending) return null;
+    
+    try {
+      return JSON.parse(task.payload.output);
+    } catch {
+      return null;
+    }
+  }, [task.payload.output, isPending]);
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <ApiOutlined className="h-4 w-4 text-sm text-purple-600" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Hyperbrowser Data Extraction</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-gray-50 to-gray-100 p-4 shadow-sm overflow-hidden">
+        {/* Website URL section */}
+        <div className="flex items-center mb-3">
+          <div className="text-xs text-gray-500 w-24">Website URL:</div>
+          <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 flex-1 truncate">
+            <a 
+              href={task.payload.input.website_url} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-blue-600 hover:text-blue-800"
+            >
+              {task.payload.input.website_url}
+            </a>
+          </div>
+        </div>
+        
+        {/* Prompt section */}
+        <div className="flex items-start mb-3">
+          <div className="text-xs text-gray-500 w-24 pt-2">Extraction Prompt:</div>
+          <div className="text-sm bg-white px-3 py-2 rounded border border-gray-200 flex-1">
+            {task.payload.input.prompt}
+          </div>
+        </div>
+        
+        {/* Schema section (if provided) */}
+        {task.payload.input.extraction_schema && (
+          <div className="flex items-start mb-3">
+            <div className="text-xs text-gray-500 w-24 pt-2">Schema:</div>
+            <div className="bg-white px-3 py-2 rounded border border-gray-200 flex-1 font-mono text-xs">
+              {task.payload.input.extraction_schema}
+            </div>
+          </div>
+        )}
+        
+        {/* Extracted data section */}
+        {!isPending && task.payload.output && (
+          <div className="mt-4">
+            <div className="text-xs text-gray-500 mb-2 flex items-center">
+              <ApiOutlined className="mr-1" /> Extracted Data
+            </div>
+            
+            <div className="bg-white rounded border border-gray-200 p-3 max-h-[300px] overflow-y-auto">
+              {extractedData ? (
+                <pre className="text-xs font-mono whitespace-pre-wrap">
+                  {JSON.stringify(extractedData, null, 2)}
+                </pre>
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{task.payload.output}</p>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></div>
+              Extracting data...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Data extraction complete
             </div>
           )}
         </div>
