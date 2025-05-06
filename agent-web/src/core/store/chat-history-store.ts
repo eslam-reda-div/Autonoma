@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { getApiUrl } from "../api/api-url-store";
 import { Message } from "../messaging";
+import { useStore } from "./store";
 
 // Types for chat history items
 export interface ChatHistoryItem {
@@ -254,6 +255,7 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
 
       deleteChat: async (uuid) => {
         try {
+          const { currentChatUuid } = get();
           const response = await fetch(getApiUrl() + `/chat/history/${uuid}`, {
             method: "DELETE"
           });
@@ -265,6 +267,16 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
           // Reload chats to get the updated list
           get().loadChatHistory();
           
+          if (uuid === currentChatUuid) {
+            useStore.setState({
+              messages: [],
+              state: {
+                messages: [],
+              }
+            }); // Clear current chat if it was deleted
+            set({ currentChatUuid: null });
+          }
+
           return true;
         } catch (error) {
           console.error("Error deleting chat:", error);
