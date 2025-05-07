@@ -35,6 +35,7 @@ interface ChatHistoryState {
   filterFavorites: boolean;
   filterFolderUuid: string | "global" | null; // null = all chats, "global" = global chats, folder_id = folder chats
   sidebarOpen: boolean;
+  isTemporaryChat: boolean; // New state for temporary chat mode
   
   // Actions
   loadChatHistory: () => Promise<void>;
@@ -54,6 +55,8 @@ interface ChatHistoryState {
   setSidebar: (isOpen: boolean) => void;
   getChatContent: () => Promise<{messages: Message[]} | null>;
   getChatContentSync: () => {messages: Message[]} | null;
+  toggleTemporaryChat: () => void; // New action to toggle temporary chat mode
+  setTemporaryChat: (isTemporary: boolean) => void; // New action to set temporary chat mode directly
 }
 
 export const useChatHistoryStore = create<ChatHistoryState>()(
@@ -68,6 +71,7 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
       filterFavorites: false,
       filterFolderUuid: null,
       sidebarOpen: false,
+      isTemporaryChat: false, // Initialize temporary chat mode as false
       
       // Actions
       loadChatHistory: async () => {
@@ -367,6 +371,14 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
       setSidebar: (isOpen) => {
         set({ sidebarOpen: isOpen });
       },
+      
+      toggleTemporaryChat: () => {
+        set(state => ({ isTemporaryChat: !state.isTemporaryChat }));
+      },
+      
+      setTemporaryChat: (isTemporary) => {
+        set({ isTemporaryChat: isTemporary });
+      },
     }),
     {
       name: 'chat-history-storage',
@@ -376,6 +388,7 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
         filterFavorites: state.filterFavorites,
         filterFolderUuid: state.filterFolderUuid,
         sidebarOpen: state.sidebarOpen,
+        // We don't persist isTemporaryChat since temporary chats should reset on page reload
       }),
     }
   )

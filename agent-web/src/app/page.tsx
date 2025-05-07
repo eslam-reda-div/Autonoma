@@ -29,7 +29,8 @@ export default function HomePage() {
   const { 
     currentChatUuid, 
     setCurrentChat,
-    loadChatHistory 
+    loadChatHistory,
+    isTemporaryChat 
   } = useChatHistoryStore();
 
   // Effect to load chat when currentChatUuid changes
@@ -69,8 +70,8 @@ export default function HomePage() {
   // Save chat after receiving response or when sending a new message
   useEffect(() => {
     const saveCurrentChat = async () => {
-      // Don't save if there are no messages or if we're still responding
-      if (messages.length === 0 || responding) return;
+      // Don't save if there are no messages, if we're still responding, or if this is a temporary chat
+      if (messages.length === 0 || responding || isTemporaryChat) return;
       
       try {
         // Prepare chat data to save
@@ -130,15 +131,15 @@ export default function HomePage() {
       }
     };
     
-    // Save when messages change and we're not responding
-    if (!responding && messages.length > 0) {
+    // Save when messages change and we're not responding (and not in temporary mode)
+    if (!responding && messages.length > 0 && !isTemporaryChat) {
       const timer = setTimeout(() => {
         saveCurrentChat();
       }, 1000); // Add a small delay to avoid saving too frequently
       
       return () => clearTimeout(timer);
     }
-  }, [messages, responding, currentChatUuid, setCurrentChat, loadChatHistory]);
+  }, [messages, responding, currentChatUuid, setCurrentChat, loadChatHistory, isTemporaryChat]);
 
   const handleSendMessage = useCallback(
     async (

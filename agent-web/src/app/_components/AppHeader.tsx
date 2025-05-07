@@ -15,7 +15,9 @@ import {
   FileType, 
   ChevronDown,
   FileText,
-  FileJson
+  FileJson,
+  Zap,
+  ZapOff
 } from "lucide-react";
 import { useStore } from "~/core/store";
 import { exportChat, ExportFormat } from "~/core/utils/export-utils";
@@ -23,10 +25,17 @@ import { useReactToPrint } from 'react-to-print';
 
 export function AppHeader({ historyView }: { historyView: React.RefObject<HTMLDivElement> }) {
   const { setShowConfigModal } = useApiUrlStore();
-  const { toggleSidebar } = useChatHistoryStore();
+  const { 
+    toggleSidebar, 
+    isTemporaryChat, 
+    toggleTemporaryChat, 
+    setTemporaryChat,
+    createNewChat 
+  } = useChatHistoryStore();
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const messages = useStore(state => state.messages);
+  const clearMessages = useStore(state => state.clearMessages);
   
   // Create the print handler at the component level, not inside an event handler
   const handlePrint = useReactToPrint({
@@ -109,6 +118,18 @@ export function AppHeader({ historyView }: { historyView: React.RefObject<HTMLDi
     }
   };
 
+  const handleNewTemporaryChat = () => {
+    if (!isTemporaryChat) {
+      // If not already in temporary mode, create a new temporary chat
+      createNewChat();
+      clearMessages();
+      setTemporaryChat(true);
+    } else {
+      // If already in temporary mode, toggle back to normal mode
+      setTemporaryChat(false);
+    }
+  };
+
   return (
     <div className="w-full flex justify-between items-center px-4">
       <div className="flex items-center gap-2">  
@@ -174,6 +195,23 @@ export function AppHeader({ historyView }: { historyView: React.RefObject<HTMLDi
           </div>
         )}
         
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button 
+              onClick={handleNewTemporaryChat}
+              className={`p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full ${isTemporaryChat ? 'bg-amber-100 dark:bg-amber-800' : ''}`}
+            >
+              {isTemporaryChat ? (
+                <ZapOff className="h-5 w-5 text-amber-500" />
+              ) : (
+                <Zap className="h-5 w-5 text-gray-500" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {isTemporaryChat ? 'Currently in Temporary Chat Mode (not saved)' : 'Create Temporary Chat (not saved)'}
+          </TooltipContent>
+        </Tooltip>
         
         <Tooltip>
           <TooltipTrigger asChild>
