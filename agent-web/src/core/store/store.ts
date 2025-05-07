@@ -96,6 +96,7 @@ export async function sendMessage(
   },
   options: { abortSignal?: AbortSignal } = {},
   messagesToKept: Message[] = [],
+  isEditing: boolean = false,
 ) {
   addMessage(message);
   let stream: AsyncIterable<ChatEvent>;
@@ -111,6 +112,7 @@ export async function sendMessage(
       },
       options,
       messagesToKept,
+      isEditing,
     );
   }
   setResponding(true);

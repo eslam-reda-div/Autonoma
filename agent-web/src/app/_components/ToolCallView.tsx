@@ -18,6 +18,9 @@ import {
   DollarOutlined,
   CloudOutlined,
   ApiOutlined,
+  CompassOutlined,
+  BulbOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
 import { LRUCache } from "lru-cache";
 import { useMemo } from "react";
@@ -29,6 +32,8 @@ import { type ToolCallTask } from "~/core/workflow";
 export function ToolCallView({ task }: { task: ToolCallTask }) {
   if (task.payload.toolName === "tavily_search") {
     return <TravilySearchToolCallView task={task as ToolCallTask<any>} />;
+  } else if (task.payload.toolName === "planner_tavily_search") {
+    return <PlannerTavilySearchToolCallView task={task as ToolCallTask<any>} />;
   } else if (task.payload.toolName === "crawl_tool") {
     return <CrawlToolCallView task={task as ToolCallTask<any>} />;
   } else if (task.payload.toolName === "browser") {
@@ -323,6 +328,121 @@ function TravilySearchToolCallView({
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+function PlannerTavilySearchToolCallView({
+  task,
+}: {
+  task: ToolCallTask<{ query: string }>;
+}) {
+  const results = useMemo(() => {
+    try {
+      const results = JSON.parse(task.payload.output ?? "") ?? [];
+      results.forEach((result: { url: string; title: string }) => {
+        pageCache.set(result.url, result.title);
+      });
+      return results;
+    } catch {
+      return [];
+    }
+  }, [task.payload.output]);
+  
+  const isPending = task.state === "pending";
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <div>
+          <CompassOutlined className="h-4 w-4 text-sm text-indigo-600" />
+        </div>
+        <div>
+          <span className="text-sm font-medium">Search Before Planning</span>
+        </div>
+      </div>
+      
+      <div className="relative w-full max-w-[640px] rounded-lg border bg-gradient-to-b from-indigo-50 to-indigo-100 p-4 shadow-sm overflow-hidden">
+        {/* Header with search query */}
+        <div className="flex items-center mb-3 bg-white rounded-lg border border-indigo-200 p-2">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 mr-3">
+            <ThunderboltOutlined className="text-indigo-600" />
+          </div>
+          <div className="flex-1">
+            <div className="text-xs text-indigo-600 font-medium">Research before planning</div>
+            <div className="text-sm font-medium mt-0.5">"{task.payload.input.query}"</div>
+          </div>
+        </div>
+        
+        {/* Results section */}
+        {!isPending && results.length > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs text-indigo-700 font-medium flex items-center">
+                <BulbOutlined className="mr-1" /> Knowledge gathered:
+              </div>
+              <div className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                {results.length} sources
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-lg border border-indigo-200 overflow-hidden">
+              <ul className="divide-y divide-indigo-100">
+                {results.map((result: { url: string; title: string; content?: string }, index: number) => (
+                  <li 
+                    key={result.url}
+                    className="p-3 hover:bg-indigo-50 transition-colors animate-bg-blink"
+                    style={{animationDelay: `${200 + index * 100}ms`}}
+                  >
+                    <a 
+                      className="flex items-start gap-2"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      href={result.url}
+                    >
+                      <div className="flex-shrink-0 mt-0.5">
+                        <img
+                          className="h-4 w-4 rounded-full bg-slate-100 shadow-sm"
+                          width={16}
+                          height={16}
+                          src={new URL(result.url).origin + "/favicon.ico"}
+                          alt={result.title}
+                          onError={(e) => {
+                            e.currentTarget.src =
+                              "https://perishablepress.com/wp/wp-content/images/2021/favicon-standard.png";
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-indigo-900 truncate">{result.title}</div>
+                        {result.content && (
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{result.content}</p>
+                        )}
+                        <div className="text-xs text-indigo-500 mt-1 truncate">{result.url}</div>
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+        
+        {/* Status indicator */}
+        <div className="flex justify-end mt-3">
+          {isPending ? (
+            <div className="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-indigo-500 mr-2 animate-pulse"></div>
+              Gathering knowledge for planning...
+            </div>
+          ) : (
+            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+              Research complete
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

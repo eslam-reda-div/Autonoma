@@ -1,3 +1,3 @@
 from src.tools.planner_tools import search
 
-print(search("wikipedia"))
+print(search("what is wikipedia"))

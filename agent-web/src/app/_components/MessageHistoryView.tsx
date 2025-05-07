@@ -71,7 +71,7 @@ export function MessageHistoryView({
             void sendMessage(updatedMessage, {
               deepThinkingMode: options.deepThinkingMode,
               searchBeforePlanning: options.searchBeforePlanning
-            }, {}, messagesToKeep);
+            }, {}, messagesToKeep, true);
             
             // Exit edit mode
             setEditingMessageId(null);

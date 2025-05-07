@@ -185,11 +185,11 @@ def _process_event(
         yield from _handle_chat_model_stream(data, node)
 
     # Handle tool start events
-    elif kind == EventType.TOOL_START.value and node in team_members:
+    elif kind == EventType.TOOL_START.value and node in team_members + ["planner"]:
         yield from _handle_tool_start(node, name, data, workflow_id, run_id)
 
     # Handle tool end events
-    elif kind == EventType.TOOL_END.value and node in team_members:
+    elif kind == EventType.TOOL_END.value and node in team_members + ["planner"]:
         yield from _handle_tool_end(node, name, data, workflow_id, run_id)
 
     return None

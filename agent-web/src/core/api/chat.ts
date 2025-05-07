@@ -20,6 +20,7 @@ export function chatStream(
   },
   options: { abortSignal?: AbortSignal } = {},
   messagesToKept: Message[] = [],
+  isEditing: boolean = false,
 ) {
   let messagePayload;
   let messageContent;
@@ -88,10 +89,15 @@ export function chatStream(
   }
 
   var chatContent: {messages:Message[]} | null = {messages: []};
-  if(messagesToKept.length > 0) {
+
+  if (isEditing) {
     chatContent.messages = messagesToKept
   }else{
-    chatContent = useChatHistoryStore.getState().getChatContentSync();
+    if(messagesToKept.length > 0) {
+      chatContent.messages = messagesToKept
+    }else{
+      chatContent = useChatHistoryStore.getState().getChatContentSync();
+    }
   }
 
   const apiRequestBody = {
