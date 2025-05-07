@@ -1,9 +1,5 @@
 from dotenv import load_dotenv
 import os
-from huggingface_hub import login
-from langchain_huggingface import HuggingFaceEndpoint, ChatHuggingFace
-from langchain_huggingface import HuggingFacePipeline
-from langchain_deepseek import ChatDeepSeek
 from langchain_openai import ChatOpenAI
 from openai import OpenAI
 import json

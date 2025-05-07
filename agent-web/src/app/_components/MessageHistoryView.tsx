@@ -217,7 +217,7 @@ function MessageView({
     return (
       <div 
         className={cn("flex flex-col", message.role === "user" && "items-end")}
-        onMouseEnter={() => message.role === "user" && setIsHovering(true)}
+        onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       >
         <div
@@ -269,6 +269,29 @@ function MessageView({
             </button>
           </div>
         )}
+        
+        {message.role === "assistant" && isHovering && (
+          <div className="flex space-x-2 mb-8 text-sm text-gray-500">
+            <button 
+              className="flex items-center hover:text-gray-700 transition-colors"
+              onClick={copyToClipboard}
+              aria-label="Copy message"
+            >
+              {copySuccess ? (
+                <>
+                  <CheckOutlined className="h-3.5 w-3.5 mr-1 text-green-500" />
+                  <span className="text-green-500">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <CopyOutlined className="h-3.5 w-3.5 mr-1" />
+                  <span>Copy</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+        
         {!isHovering && <div className="mb-8"></div>}
       </div>
     );
@@ -378,6 +401,27 @@ function MessageView({
                 <EditOutlined className="h-3.5 w-3.5 mr-1" />
                 <span>Edit</span>
               </button>
+              <button 
+                className="flex items-center hover:text-gray-700 transition-colors"
+                onClick={copyToClipboard}
+                aria-label="Copy message"
+              >
+                {copySuccess ? (
+                  <>
+                    <CheckOutlined className="h-3.5 w-3.5 mr-1 text-green-500" />
+                    <span className="text-green-500">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <CopyOutlined className="h-3.5 w-3.5 mr-1" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+          {message.role === "assistant" && isHovering && (
+            <div className="flex space-x-2 mb-8 text-sm text-gray-500">
               <button 
                 className="flex items-center hover:text-gray-700 transition-colors"
                 onClick={copyToClipboard}

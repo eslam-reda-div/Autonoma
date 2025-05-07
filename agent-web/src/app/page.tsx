@@ -24,7 +24,8 @@ export default function HomePage() {
   const responding = useStore((state) => state.responding);
   const clearMessages = useStore((state) => state.clearMessages);
   const setMessages = useStore((state) => state.setMessages);
-  
+  const componentRef = useRef<HTMLDivElement>(null);
+
   const { 
     currentChatUuid, 
     setCurrentChat,
@@ -200,11 +201,11 @@ export default function HomePage() {
       <ScrollArea className="h-screen w-full" ref={scrollAreaRef}>
         <div className="flex min-h-screen flex-col items-center">
           <header className="sticky top-0 right-0 left-0 z-10 flex h-16 w-full items-center px-4 backdrop-blur-sm">
-            <AppHeader />
+            <AppHeader historyView={componentRef} />
           </header>
-          <main className="w-full flex-1 px-4 pb-48">
+          <main ref={componentRef} className="w-full flex-1 px-4 pb-48">
             <MessageHistoryView
-              className="w-full mx-auto sm:w-[90%] md:w-[85%] lg:w-page"
+              className="w-full mx-auto sm:w-[90%] md:w-[85%] lg:w-page nead-more-width"
               messages={messages}
               loading={responding}
             />

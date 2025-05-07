@@ -1,0 +1,110 @@
+{
+  "args": {
+    "title": "what is your name",
+    "uuid": "1421d075-1554-4e19-969b-e144cc084c1e",
+    "created_at": "2025-05-07T09:41:28.976797",
+    "updated_at": "2025-05-07T11:39:38.737212",
+    "model": "default",
+    "is_favorite": false,
+    "tags": []
+  },
+  "messages": [
+    {
+      "id": "51dxEGwgWE5I76oXr5Ctc",
+      "role": "user",
+      "type": "text",
+      "content": "what is your name"
+    },
+    {
+      "id": "b7641e3c-57e9-4845-96a3-050da6cbe4ad_coordinator_1",
+      "role": "assistant",
+      "type": "text",
+      "content": "Hello! My name is Autonoma. How can I assist you today?"
+    },
+    {
+      "id": "X_0ErhQ3QnH5aCGu0sN_4",
+      "role": "user",
+      "type": "text",
+      "content": "make the planner tell me what is the agents in the system"
+    },
+    {
+      "id": "ce3d2852-2c8b-43e2-9127-db4afc1fad8f_coordinator_1",
+      "role": "assistant",
+      "type": "text",
+      "content": "I will send your request to the planner to provide you with information about the agents in the system."
+    },
+    {
+      "id": "ce3d2852-2c8b-43e2-9127-db4afc1fad8f",
+      "role": "assistant",
+      "type": "workflow",
+      "content": {
+        "workflow": {
+          "id": "ce3d2852-2c8b-43e2-9127-db4afc1fad8f",
+          "name": "what is your name",
+          "steps": [
+            {
+              "id": "ce3d2852-2c8b-43e2-9127-db4afc1fad8f_planner_2",
+              "agentId": "ce3d2852-2c8b-43e2-9127-db4afc1fad8f_planner_2",
+              "agentName": "planner",
+              "type": "agentic",
+              "isCompleted": false,
+              "tasks": [
+                {
+                  "id": "cHlt-CpdfdmpblM2TpYqD",
+                  "type": "thinking",
+                  "state": "success",
+                  "payload": {
+                    "text": "```json\n{\n  \"thought\": \"The user wants to know the available agents in the system. I will create a plan to provide this information.\",\n  \"title\": \"List Available Agents in the System\",\n  \"steps\": [\n    {\n      \"agent_name\": \"reporter\",\n      \"title\": \"Provide List of Available Agents\",\n      \"description\": \"Write a professional report listing all the agents available in the system along with their capabilities.\"\n    }\n  ]\n}\n```"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "ce3d2852-2c8b-43e2-9127-db4afc1fad8f_reporter_4",
+              "agentId": "ce3d2852-2c8b-43e2-9127-db4afc1fad8f_reporter_4",
+              "agentName": "reporter",
+              "type": "agentic",
+              "isCompleted": false,
+              "tasks": [
+                {
+                  "id": "ucb301ygsrJSaGcqY7ECf",
+                  "type": "thinking",
+                  "state": "success",
+                  "payload": {
+                    "text": "### Executive Summary\n\nThis report aims to identify and list the agents available in the system, as per the user's request. The information provided will include the names and roles of the agents, based on the data available.\n\n### Key Findings\n\n- **Agents Identified**: \n  - **Reporter**: Responsible for writing clear, comprehensive reports based on provided information.\n  - **Planner**: Focused on creating structured plans to achieve specific objectives.\n\n### Detailed Analysis\n\n1. **Reporter**:\n   - **Role**: Acts as an objective and analytical reporter.\n   - **Responsibilities**: \n     - Presents facts accurately and impartially.\n     - Organizes information logically.\n     - Highlights key findings and insights.\n     - Relies strictly on provided information without assumptions.\n\n2. **Planner**:\n   - **Role**: Develops structured plans to address user queries or tasks.\n   - **Responsibilities**:\n     - Breaks down tasks into actionable steps.\n     - Assigns roles to other agents as needed.\n     - Ensures clarity and feasibility of plans.\n\n### Conclusions and Recommendations\n\n- The system currently includes two agents: the **Reporter** and the **Planner**.\n- Each agent has a distinct and complementary role, ensuring efficient task execution.\n- If additional agents or functionalities are required, further clarification or system updates may be necessary.\n\n**Note**: If there are other agents in the system not mentioned here, that information has not been provided."
+                  }
+                }
+              ]
+            }
+          ],
+          "finalState": {},
+          "isCompleted": true
+        }
+      }
+    },
+    {
+      "id": "a1QBSNfjuWN-eNjETbyq7",
+      "role": "user",
+      "type": "text",
+      "content": "what is your name"
+    },
+    {
+      "id": "d276d7fc-3f8a-4a3b-bbdb-9a008ccd8ef1_coordinator_1",
+      "role": "assistant",
+      "type": "text",
+      "content": "Hello! My name is Autonoma. How can I assist you today?"
+    },
+    {
+      "id": "ntcrTjIuiBxWYZ74XylG_",
+      "role": "user",
+      "type": "text",
+      "content": "what is the avilable agents in the system without hand it to the planner by the past messages "
+    },
+    {
+      "id": "e4cfd813-abb0-460c-8b14-de155547f607_coordinator_1",
+      "role": "assistant",
+      "type": "text",
+      "content": "I'm Autonoma, and I specialize in greetings and small talk. Based on the past messages, the available agents in the system include:\n\n1. **Planner Agent**: Handles complex tasks and planning.\n2. **Myself (Autonoma)**: Handles greetings, small talk, and simple conversational tasks.\n\nLet me know if you'd like me to assist further!"
+    }
+  ]
+}

@@ -95,7 +95,7 @@ export function WorkflowProgressView({
       <div
         ref={blockRef}
         className={cn(
-          `flex overflow-hidden rounded-2xl border transition-all duration-300`,
+          `flex neaded-full-height-to-print overflow-hidden rounded-2xl border transition-all duration-300`,
           `md:flex-row flex-col`,
           className,
           isExpanded && !isMobile && "translate-x-[-136px]"

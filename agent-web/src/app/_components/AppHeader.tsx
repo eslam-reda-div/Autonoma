@@ -19,15 +19,53 @@ import {
 } from "lucide-react";
 import { useStore } from "~/core/store";
 import { exportChat, ExportFormat } from "~/core/utils/export-utils";
-import { PDFExportDialog } from "./PDFExportDialog";
+import { useReactToPrint } from 'react-to-print';
 
-export function AppHeader() {
+export function AppHeader({ historyView }: { historyView: React.RefObject<HTMLDivElement> }) {
   const { setShowConfigModal } = useApiUrlStore();
   const { toggleSidebar } = useChatHistoryStore();
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showPDFExportDialog, setShowPDFExportDialog] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const messages = useStore(state => state.messages);
+  
+  // Create the print handler at the component level, not inside an event handler
+  const handlePrint = useReactToPrint({
+    contentRef: historyView,
+    bodyClass: "print-body",
+    copyShadowRoots: true,
+    documentTitle: "Autonoma Chat Export",
+    fonts: [
+      {
+        family: "Inter",
+        source: "url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap')"
+      }
+    ],
+    ignoreGlobalStyles: false,
+    nonce: "",
+    onAfterPrint: () => {
+      console.log("Print completed");
+      const styleElement = document.getElementById('print-style');
+      if (styleElement) {
+        document.head.removeChild(styleElement);
+      }
+    },
+    onBeforePrint: async () => {
+      console.log("Preparing document for printing...");
+      const style = document.createElement('style');
+      style.id = 'print-style';
+      style.innerHTML = `
+        @media print {
+          @page {size: landscape !important;}
+          .neaded-full-height-to-print { height: auto !important; }
+          .nead-more-width { width: auto !important; }
+        }
+      `;
+      document.head.appendChild(style);
+    },
+    preserveAfterPrint: false,
+    print: undefined,
+    suppressErrors: true
+  });
 
   // Handle clicks outside the export menu to close it
   useEffect(() => {
@@ -44,8 +82,13 @@ export function AppHeader() {
   }, []);
 
   const handleExportToPdf = () => {
-    setShowExportMenu(false);
-    setShowPDFExportDialog(true);
+    try {
+      // Call the print handler function instead of using the hook directly
+      handlePrint();
+      setShowExportMenu(false);
+    } catch (error) {
+      console.error("Failed to export chat to PDF:", error);
+    }
   };
 
   const handleExportToText = async () => {
@@ -54,15 +97,6 @@ export function AppHeader() {
       setShowExportMenu(false);
     } catch (error) {
       console.error("Failed to export chat to TEXT:", error);
-    }
-  };
-
-  const handleExportToHTML = async () => {
-    try {
-      await exportChat(messages, ExportFormat.HTML);
-      setShowExportMenu(false);
-    } catch (error) {
-      console.error("Failed to export chat to HTML:", error);
     }
   };
 
@@ -118,21 +152,13 @@ export function AppHeader() {
                     <FileType className="h-4 w-4 mr-2" />
                     Export to PDF
                   </button>
-                  
+            
                   <button
                     onClick={handleExportToText}
                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Export to Text
-                  </button>
-                  
-                  <button
-                    onClick={handleExportToHTML}
-                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    <FileDown className="h-4 w-4 mr-2" />
-                    Export to HTML
                   </button>
                   
                   <button
@@ -163,13 +189,6 @@ export function AppHeader() {
           </TooltipContent>
         </Tooltip>
       </div>
-      
-      {/* PDF Export Dialog */}
-      <PDFExportDialog
-        open={showPDFExportDialog}
-        onOpenChange={setShowPDFExportDialog}
-        messages={messages}
-      />
     </div>
   );
 }
