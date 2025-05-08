@@ -1,4 +1,4 @@
-import { CheckOutlined, CopyOutlined } from "@ant-design/icons";
+import { CheckOutlined, CopyOutlined, SoundOutlined, PauseOutlined } from "@ant-design/icons";
 import { useState } from "react";
 import ReactMarkdown, {
   type Options as ReactMarkdownOptions,
@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { cn } from "~/core/utils";
+import { useSpeech } from "react-text-to-speech";
 
 export function Markdown({
   className,
@@ -27,6 +28,7 @@ export function Markdown({
   enableCopy?: boolean;
   style?: React.CSSProperties;
 }) {
+
   return (
     <div
       className={cn(className, "markdown flex flex-col gap-4")}
@@ -47,8 +49,9 @@ export function Markdown({
         {processKatexInMarkdown(children)}
       </ReactMarkdown>
       {enableCopy && typeof children === "string" && (
-        <div className="flex">
+        <div className="flex gap-2">
           <CopyButton content={children} />
+          <ReadAloudButton content={children} />
         </div>
       )}
     </div>
@@ -85,6 +88,40 @@ function CopyButton({ content }: { content: string }) {
       </TooltipTrigger>
       <TooltipContent>
         <p>Copy</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function ReadAloudButton({ content }: { content: string }) {
+  const cleanContent = content.replace(/[^\p{L}\p{N}\s]/gu, '');
+  const { speechStatus, start, pause, stop } = useSpeech({ text: cleanContent });
+  const isPlaying = speechStatus === "started";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full"
+          onClick={() => {
+            if (isPlaying) {
+              pause();
+            } else {
+              start();
+            }
+          }}
+        >
+          {isPlaying ? (
+            <PauseOutlined className="h-4 w-4" />
+          ) : (
+            <SoundOutlined className="h-4 w-4" />
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{isPlaying ? "Pause" : "Read Aloud"}</p>
       </TooltipContent>
     </Tooltip>
   );

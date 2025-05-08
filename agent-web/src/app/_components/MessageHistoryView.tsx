@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import Markdown from "react-markdown";
+import React from "react";
 
 import { type Message } from "~/core/messaging";
 import { cn } from "~/core/utils";
@@ -8,7 +9,8 @@ import { useStore, updateMessage, sendMessage } from "~/core/store";
 import { LoadingAnimation } from "./LoadingAnimation";
 import { WorkflowProgressView } from "./WorkflowProgressView";
 import { InputBox } from "./InputBox";
-import { EditOutlined, CopyOutlined, CheckOutlined, FileOutlined, DownloadOutlined } from "@ant-design/icons";
+import { EditOutlined, CopyOutlined, CheckOutlined, FileOutlined, DownloadOutlined, SoundOutlined, PauseOutlined } from "@ant-design/icons";
+import { useSpeech } from "react-text-to-speech";
 
 export function MessageHistoryView({
   className,
@@ -108,6 +110,21 @@ function MessageView({
   const [isHovering, setIsHovering] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
+
+  // Get content for speech synthesis
+  const speechText = React.useMemo(() => {
+    let content = "";
+    if (message.type === "text") {
+      content = message.content as string;
+    } else if (message.type === "imagetext") {
+      content = message.content.text;
+    }
+    return content.replace(/[^\p{L}\p{N}\s]/gu, '');
+  }, [message]);
+
+  // Move useSpeech hook to the top level
+  const { speechStatus, start, pause } = useSpeech({ text: speechText });
+  const isPlaying = speechStatus === "started";
 
   // Close popup when clicking outside the image
   useEffect(() => {
@@ -289,6 +306,23 @@ function MessageView({
                 </>
               )}
             </button>
+            <button 
+              className="flex items-center hover:text-gray-700 transition-colors"
+              onClick={() => isPlaying ? pause() : start()}
+              aria-label="Read aloud message"
+            >
+              {isPlaying ? (
+                <>
+                  <PauseOutlined className="h-3.5 w-3.5 mr-1" />
+                  <span>Pause</span>
+                </>
+              ) : (
+                <>
+                  <SoundOutlined className="h-3.5 w-3.5 mr-1" />
+                  <span>Read</span>
+                </>
+              )}
+            </button>
           </div>
         )}
         
@@ -303,7 +337,7 @@ function MessageView({
       <>
         <div 
           className={cn("flex flex-col", message.role === "user" && "items-end")}
-          onMouseEnter={() => message.role === "user" && setIsHovering(true)}
+          onMouseEnter={() => message.role === "user" ? setIsHovering(true) : setIsHovering(true)}
           onMouseLeave={() => setIsHovering(false)}
         >
           <div
@@ -436,6 +470,23 @@ function MessageView({
                   <>
                     <CopyOutlined className="h-3.5 w-3.5 mr-1" />
                     <span>Copy</span>
+                  </>
+                )}
+              </button>
+              <button 
+                className="flex items-center hover:text-gray-700 transition-colors"
+                onClick={() => isPlaying ? pause() : start()}
+                aria-label="Read aloud message"
+              >
+                {isPlaying ? (
+                  <>
+                    <PauseOutlined className="h-3.5 w-3.5 mr-1" />
+                    <span>Pause</span>
+                  </>
+                ) : (
+                  <>
+                    <SoundOutlined className="h-3.5 w-3.5 mr-1" />
+                    <span>Read</span>
                   </>
                 )}
               </button>
