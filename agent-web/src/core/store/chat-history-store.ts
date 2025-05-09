@@ -130,7 +130,11 @@ export const useChatHistoryStore = create<ChatHistoryState>()(
       },
       
       setCurrentChat: (uuid) => {
-        set({ currentChatUuid: uuid });
+        // When setting a chat UUID, also ensure we're not in temporary mode
+        set({ 
+          currentChatUuid: uuid,
+          isTemporaryChat: false // Exit temporary mode when loading a specific chat
+        });
       },
       
       createNewChat: () => {

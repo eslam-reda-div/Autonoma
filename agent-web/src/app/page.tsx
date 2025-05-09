@@ -15,6 +15,8 @@ import { AppHeader } from "./_components/AppHeader";
 import { InputBox } from "./_components/InputBox";
 import { MessageHistoryView } from "./_components/MessageHistoryView";
 import { ChatHistorySidebar } from "./_components/ChatHistorySidebar";
+import { updateUrlWithChatId } from "~/core/utils/url-utils";
+import { ChatUrlHandler } from "./_components/ChatUrlHandler";
 
 export default function HomePage() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -32,6 +34,11 @@ export default function HomePage() {
     loadChatHistory,
     isTemporaryChat 
   } = useChatHistoryStore();
+
+  // Update URL when currentChatUuid changes
+  useEffect(() => {
+    updateUrlWithChatId(currentChatUuid, isTemporaryChat);
+  }, [currentChatUuid, isTemporaryChat]);
 
   // Effect to load chat when currentChatUuid changes
   useEffect(() => {
@@ -196,6 +203,9 @@ export default function HomePage() {
 
   return (
     <TooltipProvider delayDuration={150}>
+      {/* Add URL handler component */}
+      <ChatUrlHandler />
+      
       {/* Add ChatHistorySidebar to the page */}
       <ChatHistorySidebar />
       
