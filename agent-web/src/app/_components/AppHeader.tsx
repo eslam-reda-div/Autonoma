@@ -66,7 +66,7 @@ export function AppHeader({ historyView }: { historyView: React.RefObject<HTMLDi
         @media print {
           @page {size: landscape !important;}
           .neaded-full-height-to-print { height: auto !important; }
-          .nead-more-width { width: auto !important; }
+          .nead-more-width { width: auto !important; padding-top: 30px !important; }
         }
       `;
       document.head.appendChild(style);
