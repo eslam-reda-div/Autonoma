@@ -2,6 +2,8 @@
 
 A **Multi-Agent AI Assistant System** that lets you automate complex computational workflows via a simple chat interface over your local network. Built with a Python backend orchestrated by LangChain + LangGraph and a Next.js frontend, Autonoma empowers you to run tasks such as web scraping, scripting, file management, and full desktop automation—all within a secure, LAN-only environment.
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/eslam-reda-div/Autonoma)
+
 ## 🚀 Features
 
 - **Chat Interface**: Interact via text or speech in English and Arabic.
